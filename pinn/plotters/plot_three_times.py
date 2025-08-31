@@ -1,9 +1,9 @@
-from pinn.problems_definitions import Problem
-
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+from mpl_toolkits.mplot3d import Axes3D  # type: ignore
 
+from pinn.problems_definitions import Problem
 
 
 def plot_three_times(problem: Problem, steps: int = 50) -> plt.Figure:
@@ -15,7 +15,7 @@ def plot_three_times(problem: Problem, steps: int = 50) -> plt.Figure:
 
     t_vals = np.linspace(problem.t_bounds[0], problem.t_bounds[1], steps)
 
-    u_vals = []
+    u_vals_list = []
     for t in t_vals:
         T = np.full_like(X, t)
         xyt_plot = torch.tensor(
@@ -23,9 +23,9 @@ def plot_three_times(problem: Problem, steps: int = 50) -> plt.Figure:
         )
         with torch.no_grad():
             u = model(xyt_plot).cpu().numpy().reshape(X.shape)
-        u_vals.append(u)
+        u_vals_list.append(u)
 
-    u_vals = np.stack(u_vals)
+    u_vals = np.stack(u_vals_list)
     u_min, u_max = np.min(u_vals), np.max(u_vals)
 
     times_idx = [0, len(t_vals) // 2, len(t_vals) - 1]
@@ -37,7 +37,7 @@ def plot_three_times(problem: Problem, steps: int = 50) -> plt.Figure:
         title = f"t = {t:.2f}"
 
         # --- 3D Surface Plot ---
-        ax3d = fig.add_subplot(2, 3, i + 1, projection="3d")
+        ax3d: Axes3D = fig.add_subplot(2, 3, i + 1, projection="3d")
         ax3d.plot_surface(X, Y, u_vals[idx], cmap="viridis")
         ax3d.set_title(f"{problem.name} - {label}")
         ax3d.set_xlabel("x")

@@ -1,44 +1,42 @@
 import sys
 from itertools import product
 from pathlib import Path
-from typing import Tuple, Any
+from typing import Any, Tuple
 
-import torch
 import matplotlib
+import torch
+
 matplotlib.use("Qt5Agg")  # Qt backend
 
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QTabWidget, QLabel
-
 from matplotlib import pyplot as plt
-
-from pinn.training import Config
-from pinn.problems_definitions import (
-    BuckleyLeverett, NonLinearNonConvexFlow,
-    PeriodicSine2D, Problem, Rarefaction1D,
-    Riemann2D, RiemannOblique
-)
-from pinn.slope_limiters import (
-    advection_residual_autograd,
-    advection_residual_mm2,
-    advection_residual_mm3,
-    advection_residual_uno
-)
-from run_training import get_config_hash
+from matplotlib.backends.backend_qt5agg import \
+    FigureCanvasQTAgg as FigureCanvas
 from plotters.plot_three_times import plot_three_times
+from PyQt5.QtWidgets import (QApplication, QLabel, QMainWindow, QTabWidget,
+                             QVBoxLayout, QWidget)
+from run_training import get_config_hash
+
+from pinn.problems_definitions import (BuckleyLeverett, NonLinearNonConvexFlow,
+                                       PeriodicSine2D, Problem, Rarefaction1D,
+                                       Riemann2D, RiemannOblique)
+from pinn.slope_limiters import (advection_residual_autograd,
+                                 advection_residual_mm2,
+                                 advection_residual_mm3,
+                                 advection_residual_uno)
+from pinn.training import Config
 
 
 def get_config_description(problem: Problem, config: Config) -> str:
     return (
         f"ε={config.epsilon} "
-        f"δ={config.delta} "
-        f"res={config.residual.__closure__[0].cell_contents.__name__}"
-        f"n_int={config.n_internal} "
-        f"n_ic={config.n_initial_condition} "
+        f"res={config.residual.__closure__[0].cell_contents.__name__}"  # type: ignore
+        f"n_int={config.n_points} "
     )
 
 
-def load_results(problem: Problem, config: Config, results_dir: Path = Path("results")) -> Tuple[Problem, Any]:
+def load_results(
+    problem: Problem, config: Config, results_dir: Path = Path("results")
+) -> Tuple[Problem, Any]:
     hash_id = get_config_hash(problem, config)
     model_path = results_dir / f"model_{hash_id}.pth"
     plot_path = results_dir / f"plot_{hash_id}.png"
@@ -77,9 +75,10 @@ class ProblemWindow(QMainWindow):
                 width, height = fig.get_size_inches() * fig.dpi
                 self.resize(int(width), int(height) + 150)
 
-
             except FileNotFoundError:
-                print(f"Results missing for {get_config_description(problem, config)}")
+                print(
+                    f"Results missing for {get_config_description(problem, config)}"
+                )
 
 
 if __name__ == "__main__":
@@ -93,9 +92,7 @@ if __name__ == "__main__":
     ]
 
     epsilons = [0.0005]
-    deltas = [1e-4]
-    n_internals = [1000000]
-    n_ics = [100000]
+    n_points = [100000]
     epochs = [30000]
     residuals = [
         advection_residual_autograd,
@@ -119,15 +116,11 @@ if __name__ == "__main__":
     configs = [
         Config(
             epsilon=e,
-            delta=d,
-            n_internal=ni,
-            n_initial_condition=nic,
+            n_points=n,
             epochs=ep,
             residual=r,
         )
-        for e, d, ni, nic, ep, r in product(
-            epsilons, deltas, n_internals, n_ics, epochs, residuals
-        )
+        for e, n, ep, r in product(epsilons, n_points, epochs, residuals)
     ]
 
     app = QApplication(sys.argv)

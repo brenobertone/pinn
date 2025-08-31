@@ -1,14 +1,13 @@
+import hashlib
 import json
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import time
+from collections import defaultdict
 from itertools import product
 from pathlib import Path
+from threading import Lock
 
 import matplotlib
 import torch
-
-import time
-from collections import defaultdict
-from threading import Lock
 
 from pinn.problems_definitions import (BuckleyLeverett, NonLinearNonConvexFlow,
                                        PeriodicSine2D, Problem, Rarefaction1D,
@@ -18,22 +17,18 @@ from pinn.slope_limiters import (advection_residual_autograd,
                                  advection_residual_mm3,
                                  advection_residual_uno)
 from pinn.training import Config, train
-import hashlib
 
 
 def get_config_hash(problem: Problem, config: Config) -> str:
     config_dict = {
         "epsilon": config.epsilon,
-        "delta": config.delta,
-        "n_internal": config.n_internal,
-        "n_initial_condition": config.n_initial_condition,
+        "n_points": config.n_points,
         "epochs": config.epochs,
-        "residual": config.residual if isinstance(config.residual, str) else config.residual.__closure__[0].cell_contents.__name__,
+        "residual": config.residual if isinstance(config.residual, str) else config.residual.__closure__[0].cell_contents.__name__,  # type: ignore
         "problem": problem.name,
     }
     config_str = json.dumps(config_dict, sort_keys=True)
     return hashlib.md5(config_str.encode()).hexdigest()
-
 
 
 if __name__ == "__main__":
@@ -49,9 +44,7 @@ if __name__ == "__main__":
     ]
 
     epsilons = [0.0025, 0.0005]
-    deltas = [1e-3, 1e-4]
-    n_internals = [1000000]
-    n_ics = [100000]
+    n_points = [1000000]
     epochs = [30000]
     residuals = [
         advection_residual_autograd,
@@ -63,18 +56,14 @@ if __name__ == "__main__":
     configs = [
         Config(
             epsilon=e,
-            delta=d,
-            n_internal=ni,
-            n_initial_condition=nic,
+            n_points=n,
             epochs=ep,
             residual=r,
         )
-        for e, d, ni, nic, ep, r in product(
-            epsilons, deltas, n_internals, n_ics, epochs, residuals
-        )
+        for e, n, ep, r in product(epsilons, n_points, epochs, residuals)
     ]
 
-    execution_times: dict[tuple[int, int, int], list[float]] = defaultdict(list)
+    execution_times: dict[tuple[int, int], list[float]] = defaultdict(list)
     lock = Lock()
 
     def run_training(problem: Problem, config: Config) -> None:
@@ -89,29 +78,32 @@ if __name__ == "__main__":
         model, plot = train(problem, config)
         elapsed = time.time() - start
 
-        key = (config.n_internal, config.n_initial_condition, config.epochs)
+        key = (config.n_points, config.epochs)
         with lock:
             execution_times[key].append(elapsed)
             mean = sum(execution_times[key]) / len(execution_times[key])
-            print(f"Group {key} | New time: {elapsed:.2f}s | Mean: {mean:.2f}s")
+            print(
+                f"Group {key} | New time: {elapsed:.2f}s | Mean: {mean:.2f}s"
+            )
 
         Path("results").mkdir(exist_ok=True)
         torch.save(model.state_dict(), f"results/model_{config_hash}.pth")
         plot.savefig(f"results/plot_{config_hash}.png")
 
         with config_path.open("w") as f:
-            json.dump({
-                "epsilon": config.epsilon,
-                "delta": config.delta,
-                "n_internal": config.n_internal,
-                "n_initial_condition": config.n_initial_condition,
-                "epochs": config.epochs,
-                "residual": config.residual.__closure__[0].cell_contents.__name__,
-                "problem": problem.name,
-            }, f, indent=2)
-
+            json.dump(
+                {
+                    "epsilon": config.epsilon,
+                    "n_points": config.n_points,
+                    "epochs": config.epochs,
+                    "residual": config.residual.__closure__[0].cell_contents.__name__,  # type: ignore
+                    "problem": problem.name,
+                },
+                f,
+                indent=2,
+            )
 
     combinations = list(product(problems, configs))
 
     for problem, config in combinations:
-        run_training(problem(), config)
+        run_training(problem(), config)  # type: ignore

@@ -5,9 +5,6 @@ all:
 	@poetry run isort .
 	@poetry run flake8 .
 
-deploy:
-	poetry run modal deploy -m pinn.modal_function
-
 run_training:
 	poetry run python pinn/run_training.py
 

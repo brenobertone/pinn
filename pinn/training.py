@@ -3,9 +3,9 @@ from typing import Callable
 
 import matplotlib
 import matplotlib.pyplot as plt
+import numpy as np
 import torch
 from matplotlib.figure import Figure
-import numpy as np
 
 from .problems_definitions import PINN, Problem
 
@@ -16,19 +16,15 @@ class Config:
     def __init__(
         self,
         epsilon: float,
-        delta: float,
-        n_internal: int,
-        n_initial_condition: int,
+        n_points: int,
         epochs: int,
         residual: Callable,
     ):
         self.epsilon = epsilon
-        self.delta = delta
-        self.n_internal = n_internal
-        self.n_initial_condition = n_initial_condition
+        self.n_points = n_points
         self.epochs = epochs
         self.residual = lambda model, problem, xyt: residual(
-            model, problem, xyt, self.epsilon, self.delta
+            model, problem, xyt, self.epsilon
         )
 
 
@@ -38,11 +34,11 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 def latin_hypercube(n: int, d: int) -> np.ndarray:
     """Generate an n x d Latin Hypercube sample in [0,1]^d."""
     rng = np.random.default_rng()
-    cut = np.linspace(0, 1, n+1)
+    cut = np.linspace(0, 1, n + 1)
 
     u = rng.uniform(size=(n, d))
     a = cut[:n]
-    b = cut[1:n+1]
+    b = cut[1 : n + 1]
     rdpoints = u * (b - a)[:, None] + a[:, None]
     H = np.zeros_like(rdpoints)
 
@@ -52,10 +48,12 @@ def latin_hypercube(n: int, d: int) -> np.ndarray:
 
     return H
 
-def scale_samples(samples: np.ndarray, lower: list[float], upper: list[float]) -> np.ndarray:
-    lower, upper = np.array(lower), np.array(upper)
-    return lower + samples * (upper - lower)
 
+def scale_samples(
+    samples: np.ndarray, lower: list[float], upper: list[float]
+) -> np.ndarray:
+    lower_a, upper_a = np.array(lower), np.array(upper)
+    return lower_a + samples * (upper_a - lower_a)
 
 
 def train(problem: Problem, config: Config) -> tuple[PINN, Figure]:
@@ -66,7 +64,7 @@ def train(problem: Problem, config: Config) -> tuple[PINN, Figure]:
     optimizer = torch.optim.RMSprop(model.parameters(), lr=1e-3)
 
     # Internal residual points (x,y,t)
-    sample_f = latin_hypercube(config.n_internal, d=3)
+    sample_f = latin_hypercube(config.n_points, d=3)
     xyt_f_np = scale_samples(
         sample_f,
         [problem.x_bounds[0], problem.y_bounds[0], problem.t_bounds[0]],
@@ -75,7 +73,7 @@ def train(problem: Problem, config: Config) -> tuple[PINN, Figure]:
     xyt_f = torch.tensor(xyt_f_np, dtype=torch.float32, device=device)
 
     # Initial condition (x,y)
-    sample_ic = latin_hypercube(config.n_initial_condition, d=2)
+    sample_ic = latin_hypercube(config.n_points, d=2)
     xy_ic_np = scale_samples(
         sample_ic,
         [problem.x_bounds[0], problem.y_bounds[0]],
