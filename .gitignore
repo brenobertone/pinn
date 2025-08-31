@@ -1,0 +1,5 @@
+report/*
+results/*
+.DS_Store
+pinn/__pycache__/*
+pinn/plotters/__pycache__/*
