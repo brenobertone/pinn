@@ -3,3 +3,4 @@ results/*
 .DS_Store
 pinn/__pycache__/*
 pinn/plotters/__pycache__/*
+*.zip
