@@ -11,6 +11,8 @@ from .problems_definitions import PINN, Problem
 
 matplotlib.use("Agg")
 
+PADDING = 10
+
 
 class Config:
     def __init__(
@@ -31,29 +33,26 @@ class Config:
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
-def latin_hypercube(n: int, d: int) -> np.ndarray:
-    """Generate an n x d Latin Hypercube sample in [0,1]^d."""
-    rng = np.random.default_rng()
-    cut = np.linspace(0, 1, n + 1)
+def uniform_mesh(
+    n_points: int, 
+    bounds: list[tuple[float, float]],
+) -> torch.Tensor:
+    """
+    Generate a structured uniform mesh in [x,y,t].
+    n_points: (Nx, Ny, Nt)
+    bounds: [(x_min, x_max), (y_min, y_max), (t_min, t_max)]
+    """
+    Nx = Ny = Nt = round(n_points**(1/3))
+    (x_min, x_max), (y_min, y_max), (t_min, t_max) = bounds
 
-    u = rng.uniform(size=(n, d))
-    a = cut[:n]
-    b = cut[1 : n + 1]
-    rdpoints = u * (b - a)[:, None] + a[:, None]
-    H = np.zeros_like(rdpoints)
+    Nx_pad, Ny_pad, Nt_pad = Nx + 2 * PADDING, Ny + 2 * PADDING, Nt + 2 * PADDING
 
-    for j in range(d):
-        order = rng.permutation(n)
-        H[:, j] = rdpoints[order, j]
+    x = torch.linspace(x_min, x_max, Nx_pad, device=device)
+    y = torch.linspace(y_min, y_max, Ny_pad, device=device)
+    t = torch.linspace(t_min, t_max, Nt_pad, device=device)
 
-    return H
-
-
-def scale_samples(
-    samples: np.ndarray, lower: list[float], upper: list[float]
-) -> np.ndarray:
-    lower_a, upper_a = np.array(lower), np.array(upper)
-    return lower_a + samples * (upper_a - lower_a)
+    X, Y, T = torch.meshgrid(x, y, t, indexing="ij")
+    return torch.stack([X, Y, T], dim=-1)  # shape (Nx,Ny,Nt,3)
 
 
 def train(problem: Problem, config: Config) -> tuple[PINN, Figure]:
@@ -63,26 +62,34 @@ def train(problem: Problem, config: Config) -> tuple[PINN, Figure]:
     model.to(device)
     optimizer = torch.optim.RMSprop(model.parameters(), lr=1e-3)
 
-    # Internal residual points (x,y,t)
-    sample_f = latin_hypercube(config.n_points, d=3)
-    xyt_f_np = scale_samples(
-        sample_f,
-        [problem.x_bounds[0], problem.y_bounds[0], problem.t_bounds[0]],
-        [problem.x_bounds[1], problem.y_bounds[1], problem.t_bounds[1]],
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer,
+        mode="min",
+        factor=0.8,
+        patience=500,
+        threshold=1e-5,
+        cooldown=50,
+        min_lr=1e-6,
     )
-    xyt_f = torch.tensor(xyt_f_np, dtype=torch.float32, device=device)
 
-    # Initial condition (x,y)
-    sample_ic = latin_hypercube(config.n_points, d=2)
-    xy_ic_np = scale_samples(
-        sample_ic,
-        [problem.x_bounds[0], problem.y_bounds[0]],
-        [problem.x_bounds[1], problem.y_bounds[1]],
+    xyt_f = uniform_mesh(
+        config.n_points,
+        [
+            (problem.x_bounds[0], problem.x_bounds[1]),
+            (problem.y_bounds[0], problem.y_bounds[1]),
+            (problem.t_bounds[0], problem.t_bounds[1])
+        ]
     )
-    xy_ic = torch.tensor(xy_ic_np, dtype=torch.float32, device=device)
 
-    x_ic = torch.tensor(xy_ic_np[:, 0:1], dtype=torch.float32, device=device)
-    y_ic = torch.tensor(xy_ic_np[:, 1:2], dtype=torch.float32, device=device)
+    Nx = Ny = Nt = round(config.n_points**(1/3))
+    x_mask = slice(PADDING, PADDING + Nx)
+    y_mask = slice(PADDING, PADDING + Ny)
+    t_mask = slice(PADDING, PADDING + Nt)
+
+    xyt_inner = xyt_f[x_mask, y_mask, t_mask, :].reshape(-1, 3)
+
+    x_ic = xyt_inner.reshape(-1, 3)[:, 0:1]
+    y_ic = xyt_inner.reshape(-1, 3)[:, 1:2]
     t_ic = torch.zeros_like(x_ic, device=device)
     xyt_ic = torch.cat([x_ic, y_ic, t_ic], dim=1)
 
@@ -104,6 +111,7 @@ def train(problem: Problem, config: Config) -> tuple[PINN, Figure]:
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
+        scheduler.step(loss_f.item())
 
         if epoch % 5000 == 0:
             elapsed = time.time() - start_training

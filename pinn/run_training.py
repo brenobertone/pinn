@@ -35,19 +35,19 @@ if __name__ == "__main__":
     matplotlib.use("Agg")
 
     problems = [
-        # PeriodicSine2D,
-        # Rarefaction1D,
+        PeriodicSine2D,
+        Rarefaction1D,
         RiemannOblique,
         Riemann2D,
         BuckleyLeverett,
         NonLinearNonConvexFlow,
     ]
 
-    epsilons = [0.0025, 0.0005]
-    n_points = [1000000]
-    epochs = [30000]
+    epsilons = [0.0025]
+    n_points = [128000]
+    epochs = [15000]
     residuals = [
-        advection_residual_autograd,
+        # advection_residual_autograd,
         advection_residual_mm2,
         advection_residual_mm3,
         advection_residual_uno,

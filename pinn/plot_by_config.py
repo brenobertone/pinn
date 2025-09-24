@@ -83,35 +83,23 @@ class ProblemWindow(QMainWindow):
 
 if __name__ == "__main__":
     problems = [
-        # PeriodicSine2D(),
-        # Rarefaction1D(),
-        # RiemannOblique(),
-        # Riemann2D(),
-        BuckleyLeverett(),
-        # NonLinearNonConvexFlow(),
+        PeriodicSine2D,
+        Rarefaction1D,
+        RiemannOblique,
+        Riemann2D,
+        BuckleyLeverett,
+        NonLinearNonConvexFlow,
     ]
 
-    epsilons = [0.0005]
-    n_points = [100000]
-    epochs = [30000]
+    epsilons = [0.0025]
+    n_points = [128000]
+    epochs = [15000]
     residuals = [
-        advection_residual_autograd,
+        # advection_residual_autograd,
         advection_residual_mm2,
         advection_residual_mm3,
         advection_residual_uno,
     ]
-
-    # epsilons = [0.0025]
-    # deltas = [1e-3]
-    # n_internals = [50000, 200000, 1000000]
-    # n_ics = [15000, 30000, 60000, 100000]
-    # epochs = [10000, 30000]
-    # residuals = [
-    #     advection_residual_autograd,
-    #     advection_residual_mm2,
-    #     advection_residual_mm3,
-    #     advection_residual_uno,
-    # ]
 
     configs = [
         Config(
