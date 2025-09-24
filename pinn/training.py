@@ -11,7 +11,7 @@ from .problems_definitions import PINN, Problem
 
 matplotlib.use("Agg")
 
-PADDING = 10
+PADDING = 2
 
 
 class Config:
