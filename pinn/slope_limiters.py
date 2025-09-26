@@ -275,8 +275,8 @@ def advection_residual_uno(
     u = model(xyt.reshape(-1, 3))
     u = u.view(Nx, Ny, Nt)
 
-    _, _, u_t, u_xx, u_yy = diff_ops_mm3(u, deltas, Ns)
-    f1_u_x, _, _, _, _ = diff_ops_mm3(problem.f1(u), deltas, Ns)
-    _, f2_u_y, _, _, _ = diff_ops_mm3(problem.f2(u), deltas, Ns)
+    _, _, u_t, u_xx, u_yy = diff_ops_uno(u, deltas, Ns)
+    f1_u_x, _, _, _, _ = diff_ops_uno(problem.f1(u), deltas, Ns)
+    _, f2_u_y, _, _, _ = diff_ops_uno(problem.f2(u), deltas, Ns)
 
     return u_t + f1_u_x + f2_u_y - epsilon * (u_xx + u_yy)
