@@ -84,3 +84,4 @@ if __name__ == "__main__":
                 continue
             hash_id = get_config_hash(problem, config)
             animate_problem(trained_problem, hash_id=hash_id)
+            plot_three_times(trained_problem, hash_id=hash_id)
