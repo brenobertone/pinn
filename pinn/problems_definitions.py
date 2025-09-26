@@ -112,6 +112,30 @@ class Rarefaction1D(Problem):
         return u
 
 
+class Shock1D(Problem):
+    x_bounds = (-6.0, 6.0)
+    y_bounds = (-1.5, 1.5)
+    t_bounds = (0.0, 4*2.5)
+    name = "Rarefaction1D"
+    net = PINN(n_inputs=3, n_outputs=1)
+
+    @staticmethod
+    def f1(u):
+        return u**2 / 2
+
+    @staticmethod
+    def f2(u):
+        return u**2 / 2
+
+    def initial_condition(
+        self, x: torch.Tensor, y: torch.Tensor
+    ) -> torch.Tensor:
+        u = torch.zeros_like(x)
+        u[x > 0] = -1.0
+        u[x < 0] = 0
+        return u
+
+
 class RiemannOblique(Problem):
     x_bounds = (0.0, 1.0)
     y_bounds = (0.0, 1.0)
