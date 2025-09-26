@@ -1,9 +1,9 @@
 all:
-	@poetry run mypy .
 	@poetry run autoflake --in-place --remove-unused-variables -r pinn/
 	@poetry run black --line-length 79 .
 	@poetry run isort .
 	@poetry run flake8 .
+	@poetry run mypy .
 
 run_training:
 	poetry run python pinn/run_training.py

@@ -44,10 +44,10 @@ if __name__ == "__main__":
     ]
 
     epsilons = [0.0025]
-    n_points = [128000]
-    epochs = [15000]
+    n_points = [128]  # 000, 256000, 512000]
+    epochs = [10]
     residuals = [
-        # advection_residual_autograd,
+        advection_residual_autograd,
         advection_residual_mm2,
         advection_residual_mm3,
         advection_residual_uno,
@@ -103,7 +103,7 @@ if __name__ == "__main__":
                 indent=2,
             )
 
-    combinations = list(product(problems, configs))
+    combinations = list(product(configs, problems))
 
-    for problem, config in combinations:
+    for config, problem in combinations:
         run_training(problem(), config)  # type: ignore

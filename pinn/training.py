@@ -34,7 +34,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 def uniform_mesh(
-    n_points: int, 
+    n_points: int,
     bounds: list[tuple[float, float]],
 ) -> torch.Tensor:
     """
@@ -42,10 +42,14 @@ def uniform_mesh(
     n_points: (Nx, Ny, Nt)
     bounds: [(x_min, x_max), (y_min, y_max), (t_min, t_max)]
     """
-    Nx = Ny = Nt = round(n_points**(1/3))
+    Nx = Ny = Nt = round(n_points ** (1 / 3))
     (x_min, x_max), (y_min, y_max), (t_min, t_max) = bounds
 
-    Nx_pad, Ny_pad, Nt_pad = Nx + 2 * PADDING, Ny + 2 * PADDING, Nt + 2 * PADDING
+    Nx_pad, Ny_pad, Nt_pad = (
+        Nx + 2 * PADDING,
+        Ny + 2 * PADDING,
+        Nt + 2 * PADDING,
+    )
 
     x = torch.linspace(x_min, x_max, Nx_pad, device=device)
     y = torch.linspace(y_min, y_max, Ny_pad, device=device)
@@ -77,11 +81,11 @@ def train(problem: Problem, config: Config) -> tuple[PINN, Figure]:
         [
             (problem.x_bounds[0], problem.x_bounds[1]),
             (problem.y_bounds[0], problem.y_bounds[1]),
-            (problem.t_bounds[0], problem.t_bounds[1])
-        ]
+            (problem.t_bounds[0], problem.t_bounds[1]),
+        ],
     )
 
-    Nx = Ny = Nt = round(config.n_points**(1/3))
+    Nx = Ny = Nt = round(config.n_points ** (1 / 3))
     x_mask = slice(PADDING, PADDING + Nx)
     y_mask = slice(PADDING, PADDING + Ny)
     t_mask = slice(PADDING, PADDING + Nt)
