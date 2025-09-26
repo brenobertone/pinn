@@ -25,17 +25,16 @@ class Config:
         self.epsilon = epsilon
         self.n_points = n_points
         self.epochs = epochs
-        self.residual = lambda model, problem, xyt: residual(
-            model, problem, xyt, self.epsilon
-        )
+        self.residual_fn = residual
 
-
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+    def residual(self, model, problem, xyt):
+        return self.residual_fn(model, problem, xyt, self.epsilon)
+    
 
 def uniform_mesh(
     n_points: int,
     bounds: list[tuple[float, float]],
+    device
 ) -> torch.Tensor:
     """
     Generate a structured uniform mesh in [x,y,t].
@@ -59,7 +58,7 @@ def uniform_mesh(
     return torch.stack([X, Y, T], dim=-1)  # shape (Nx,Ny,Nt,3)
 
 
-def train(problem: Problem, config: Config) -> tuple[PINN, Figure]:
+def train(problem: Problem, config: Config, device) -> tuple[PINN, Figure]:
     print(f"Training {problem.name}...")
 
     model = problem.net
@@ -83,6 +82,7 @@ def train(problem: Problem, config: Config) -> tuple[PINN, Figure]:
             (problem.y_bounds[0], problem.y_bounds[1]),
             (problem.t_bounds[0], problem.t_bounds[1]),
         ],
+        device
     )
 
     Nx = Ny = Nt = round(config.n_points ** (1 / 3))

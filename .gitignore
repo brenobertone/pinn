@@ -4,3 +4,5 @@ results/*
 pinn/__pycache__/*
 pinn/plotters/__pycache__/*
 *.zip
+pictures/*
+videos/*

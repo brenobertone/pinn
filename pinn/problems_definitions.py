@@ -137,8 +137,8 @@ class Shock1D(Problem):
 
 
 class Pulse(Problem):
-    x_bounds = (-5.0, 5.0)
-    y_bounds = (-5, 5)
+    x_bounds = (-3.0, 3.0)
+    y_bounds = (-3, 3)
     t_bounds = (0.0, 10)
     name = "Pulse"
     net = PINN(n_inputs=3, n_outputs=1)

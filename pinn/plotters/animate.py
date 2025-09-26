@@ -2,18 +2,18 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from mpl_toolkits.mplot3d import Axes3D  # type: ignore
+from matplotlib.animation import FuncAnimation, FFMpegWriter
 from pathlib import Path
 
 from pinn.problems_definitions import Problem
 
 
-def plot_three_times(problem: Problem, steps: int = 50, hash_id: str = "default") -> plt.Figure:
+def animate_problem(problem: Problem, steps: int = 200, hash_id: str = "default") -> None:
     model = problem.net
 
     x_plot = np.linspace(problem.x_bounds[0], problem.x_bounds[1], 100)
     y_plot = np.linspace(problem.y_bounds[0], problem.y_bounds[1], 100)
     X, Y = np.meshgrid(x_plot, y_plot)
-
     t_vals = np.linspace(problem.t_bounds[0], problem.t_bounds[1], steps)
 
     u_vals_list = []
@@ -25,61 +25,56 @@ def plot_three_times(problem: Problem, steps: int = 50, hash_id: str = "default"
         with torch.no_grad():
             u = model(xyt_plot).cpu().numpy().reshape(X.shape)
         u_vals_list.append(u)
-
     u_vals = np.stack(u_vals_list)
     u_min, u_max = np.min(u_vals), np.max(u_vals)
 
-    times_idx = [0, len(t_vals) // 2, len(t_vals) - 1]
-    time_labels = ["initial", "middle", "final"]
+    fig = plt.figure(figsize=(12, 6))
+    ax3d: Axes3D = fig.add_subplot(1, 2, 1, projection="3d")
+    ax2d = fig.add_subplot(1, 2, 2)
 
-    fig = plt.figure(figsize=(18, 10))  # 3 columns, 2 rows
-    for i, (idx, label) in enumerate(zip(times_idx, time_labels)):
-        t = t_vals[idx]
-        title = f"t = {t:.2f}"
+    contour = ax2d.contourf(X, Y, u_vals[0], levels=50, cmap="viridis")
+    cbar = fig.colorbar(contour, ax=ax2d)  # create colorbar once
 
-        # --- 3D Surface Plot ---
-        ax3d: Axes3D = fig.add_subplot(2, 3, i + 1, projection="3d")
-        ax3d.plot_surface(X, Y, u_vals[idx], cmap="viridis")
-        ax3d.set_title(f"{problem.name} - {label}")
+    def update(frame: int):
+        ax3d.clear()
+        ax2d.clear()
+
+        # 3D Surface
+        ax3d.plot_surface(X, Y, u_vals[frame], cmap="viridis")
         ax3d.set_xlabel("x")
         ax3d.set_ylabel("y")
         ax3d.set_zlabel("u")
         ax3d.set_zlim(u_min, u_max)
         ax3d.view_init(elev=30, azim=-135)
+        ax3d.set_title(f"{problem.name} - 3D - t = {t_vals[frame]:.2f}")
 
-        if problem.x_orientation == "crescent":
-            ax3d.set_xlim(problem.x_bounds[0], problem.x_bounds[1])
-        else:
-            ax3d.set_xlim(problem.x_bounds[1], problem.x_bounds[0])
-
-        if problem.y_orientation == "crescent":
-            ax3d.set_ylim(problem.y_bounds[0], problem.y_bounds[1])
-        else:
-            ax3d.set_ylim(problem.y_bounds[1], problem.y_bounds[0])
-
-        # --- Contour Plot ---
-        ax2d = fig.add_subplot(2, 3, i + 4)
-        contour = ax2d.contourf(X, Y, u_vals[idx], levels=50, cmap="viridis")
-        plt.colorbar(contour, ax=ax2d)
-        ax2d.set_title(f"{problem.name} - Contour - {label}")
+        # 2D Contour
+        contour = ax2d.contourf(X, Y, u_vals[frame], levels=50, cmap="viridis")
         ax2d.set_xlabel("x")
         ax2d.set_ylabel("y")
+        ax2d.set_title(f"{problem.name} - Contour - t = {t_vals[frame]:.2f}")
 
+        # Optional: maintain axis orientation
         if problem.x_orientation == "crescent":
+            ax3d.set_xlim(problem.x_bounds[0], problem.x_bounds[1])
             ax2d.set_xlim(problem.x_bounds[0], problem.x_bounds[1])
         else:
+            ax3d.set_xlim(problem.x_bounds[1], problem.x_bounds[0])
             ax2d.set_xlim(problem.x_bounds[1], problem.x_bounds[0])
 
         if problem.y_orientation == "crescent":
+            ax3d.set_ylim(problem.y_bounds[0], problem.y_bounds[1])
             ax2d.set_ylim(problem.y_bounds[0], problem.y_bounds[1])
         else:
+            ax3d.set_ylim(problem.y_bounds[1], problem.y_bounds[0])
             ax2d.set_ylim(problem.y_bounds[1], problem.y_bounds[0])
 
-    plt.tight_layout()
+        return ax3d, ax2d
 
-    # Save figure
-    save_path = Path("pictures")
+    anim = FuncAnimation(fig, update, frames=len(t_vals), blit=False)
+
+    save_path = Path("videos")
     save_path.mkdir(exist_ok=True, parents=True)
-    fig.savefig(save_path / f"plot_three_times_{hash_id}.png", dpi=150)
+    anim.save(save_path / f"animate_problem_{hash_id}.mp4", writer=FFMpegWriter(fps=15))
 
-    return fig
+    plt.close(fig)
