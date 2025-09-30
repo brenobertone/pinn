@@ -46,23 +46,23 @@ def load_results(
 if __name__ == "__main__":
     problems = [
         PeriodicSine2D,
-        Rarefaction1D,
-        RiemannOblique,
-        Riemann2D,
-        BuckleyLeverett,
-        NonLinearNonConvexFlow,
-        Shock1D,
-        Pulse,
+        # Rarefaction1D,
+        # RiemannOblique,
+        # Riemann2D,
+        # BuckleyLeverett,
+        # NonLinearNonConvexFlow,
+        # Shock1D,
+        # Pulse,
     ]
 
     epsilons = [0.0025]
-    n_points = [1024000]
+    n_points = [512000]
     epochs = [15000]
     residuals = [
         advection_residual_autograd,
-        advection_residual_mm2,
-        advection_residual_mm3,
-        advection_residual_uno,
+        # advection_residual_mm2,
+        # advection_residual_mm3,
+        # advection_residual_uno,
     ]
 
     configs = [
@@ -84,4 +84,4 @@ if __name__ == "__main__":
                 continue
             hash_id = get_config_hash(problem, config)
             animate_problem(trained_problem, hash_id=hash_id)
-            plot_three_times(trained_problem, hash_id=hash_id)
+            # plot_three_times(trained_problem, hash_id=hash_id)
