@@ -1,14 +1,17 @@
+from pathlib import Path
+
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+from matplotlib.animation import FFMpegWriter, FuncAnimation
 from mpl_toolkits.mplot3d import Axes3D  # type: ignore
-from matplotlib.animation import FuncAnimation, FFMpegWriter
-from pathlib import Path
 
 from pinn.problems_definitions import Problem
 
 
-def animate_problem(problem: Problem, steps: int = 200, hash_id: str = "default") -> None:
+def animate_problem(
+    problem: Problem, steps: int = 200, hash_id: str = "default"
+) -> None:
     model = problem.net
 
     x_plot = np.linspace(problem.x_bounds[0], problem.x_bounds[1], 100)
@@ -32,7 +35,9 @@ def animate_problem(problem: Problem, steps: int = 200, hash_id: str = "default"
     ax3d: Axes3D = fig.add_subplot(1, 2, 1, projection="3d")
     ax2d = fig.add_subplot(1, 2, 2)
 
-    contour = ax2d.contourf(X, Y, u_vals[0], levels=50, cmap="viridis")
+    contour = ax2d.contourf(
+        X, Y, u_vals[0], levels=50, cmap="viridis", vmin=u_min, vmax=u_max
+    )
     cbar = fig.colorbar(contour, ax=ax2d)  # create colorbar once
 
     def update(frame: int):
@@ -40,7 +45,9 @@ def animate_problem(problem: Problem, steps: int = 200, hash_id: str = "default"
         ax2d.clear()
 
         # 3D Surface
-        ax3d.plot_surface(X, Y, u_vals[frame], cmap="viridis")
+        ax3d.plot_surface(
+            X, Y, u_vals[frame], cmap="viridis", vmin=u_min, vmax=u_max
+        )
         ax3d.set_xlabel("x")
         ax3d.set_ylabel("y")
         ax3d.set_zlabel("u")
@@ -49,7 +56,15 @@ def animate_problem(problem: Problem, steps: int = 200, hash_id: str = "default"
         ax3d.set_title(f"{problem.name} - 3D - t = {t_vals[frame]:.2f}")
 
         # 2D Contour
-        contour = ax2d.contourf(X, Y, u_vals[frame], levels=50, cmap="viridis")
+        contour = ax2d.contourf(
+            X,
+            Y,
+            u_vals[frame],
+            levels=50,
+            cmap="viridis",
+            vmin=u_min,
+            vmax=u_max,
+        )
         ax2d.set_xlabel("x")
         ax2d.set_ylabel("y")
         ax2d.set_title(f"{problem.name} - Contour - t = {t_vals[frame]:.2f}")
@@ -75,6 +90,9 @@ def animate_problem(problem: Problem, steps: int = 200, hash_id: str = "default"
 
     save_path = Path("videos")
     save_path.mkdir(exist_ok=True, parents=True)
-    anim.save(save_path / f"animate_problem_{hash_id}.mp4", writer=FFMpegWriter(fps=15))
+    anim.save(
+        save_path / f"animate_problem_{hash_id}.mp4",
+        writer=FFMpegWriter(fps=15),
+    )
 
     plt.close(fig)

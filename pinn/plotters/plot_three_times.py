@@ -1,13 +1,16 @@
+from pathlib import Path
+
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from mpl_toolkits.mplot3d import Axes3D  # type: ignore
-from pathlib import Path
 
 from pinn.problems_definitions import Problem
 
 
-def plot_three_times(problem: Problem, steps: int = 50, hash_id: str = "default") -> plt.Figure:
+def plot_three_times(
+    problem: Problem, steps: int = 50, hash_id: str = "default"
+) -> plt.Figure:
     model = problem.net
 
     x_plot = np.linspace(problem.x_bounds[0], problem.x_bounds[1], 100)

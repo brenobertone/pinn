@@ -1,19 +1,17 @@
-import sys
 from itertools import product
 from pathlib import Path
 from typing import Any, Tuple
 
 import torch
-
 from matplotlib import pyplot as plt
-
-from plotters.plot_three_times import plot_three_times
 from plotters.animate import animate_problem
+from plotters.plot_three_times import plot_three_times
 from run_training import get_config_hash
 
 from pinn.problems_definitions import (BuckleyLeverett, NonLinearNonConvexFlow,
-                                       PeriodicSine2D, Problem, Rarefaction1D,
-                                       Riemann2D, RiemannOblique, Shock1D, Pulse)
+                                       PeriodicSine2D, Problem, Pulse,
+                                       Rarefaction1D, Riemann2D,
+                                       RiemannOblique, Shock1D)
 from pinn.slope_limiters import (advection_residual_autograd,
                                  advection_residual_mm2,
                                  advection_residual_mm3,
@@ -46,23 +44,23 @@ def load_results(
 if __name__ == "__main__":
     problems = [
         PeriodicSine2D,
-        # Rarefaction1D,
-        # RiemannOblique,
-        # Riemann2D,
-        # BuckleyLeverett,
-        # NonLinearNonConvexFlow,
-        # Shock1D,
-        # Pulse,
+        Rarefaction1D,
+        RiemannOblique,
+        Riemann2D,
+        BuckleyLeverett,
+        NonLinearNonConvexFlow,
+        Shock1D,
+        Pulse,
     ]
 
     epsilons = [0.0025]
-    n_points = [512000]
+    n_points = [128000, 256000, 512000]
     epochs = [15000]
     residuals = [
         advection_residual_autograd,
-        # advection_residual_mm2,
-        # advection_residual_mm3,
-        # advection_residual_uno,
+        advection_residual_mm2,
+        advection_residual_mm3,
+        advection_residual_uno,
     ]
 
     configs = [
@@ -77,11 +75,15 @@ if __name__ == "__main__":
 
     for config in configs:
         for problem in problems:
-            print(f"Plotting {problem.name} with {config}")
+            hash_id = get_config_hash(problem, config)
+            if Path(f"videos/animate_problem_{hash_id}.mp4").exists():
+                continue
+
             try:
                 trained_problem, _ = load_results(problem, config)
             except:
                 continue
-            hash_id = get_config_hash(problem, config)
+
+            print(f"Plotting {problem.name} with {config}")
             animate_problem(trained_problem, hash_id=hash_id)
-            # plot_three_times(trained_problem, hash_id=hash_id)
+            plot_three_times(trained_problem, hash_id=hash_id)

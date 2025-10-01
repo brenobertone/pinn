@@ -10,8 +10,9 @@ import matplotlib
 import torch
 
 from pinn.problems_definitions import (BuckleyLeverett, NonLinearNonConvexFlow,
-                                       PeriodicSine2D, Problem, Rarefaction1D,
-                                       Riemann2D, RiemannOblique, Shock1D, Pulse)
+                                       PeriodicSine2D, Problem, Pulse,
+                                       Rarefaction1D, Riemann2D,
+                                       RiemannOblique, Shock1D)
 from pinn.slope_limiters import (advection_residual_autograd,
                                  advection_residual_mm2,
                                  advection_residual_mm3,
@@ -46,10 +47,10 @@ if __name__ == "__main__":
     ]
 
     epsilons = [0.0025]
-    n_points = [128000, 256000, 512000]
+    n_points = [128000, 256000, 512000, 1024000]
     epochs = [15000]
     residuals = [
-        # advection_residual_autograd,
+        advection_residual_autograd,
         advection_residual_mm2,
         advection_residual_mm3,
         advection_residual_uno,
