@@ -7,3 +7,4 @@ pinn/plotters/__pycache__/*
 pictures/*
 videos/*
 results_*__pycache__/
+.backup_old_results/
