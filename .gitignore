@@ -8,3 +8,4 @@ pictures/*
 videos/*
 results_*__pycache__/
 .backup_old_results/
+__pycache__/*
