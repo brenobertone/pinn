@@ -1,95 +1,202 @@
 # IC-PINN
 
-Physics-Informed Neural Network solver for 2D hyperbolic conservation laws with slope limiters.
+Physics-Informed Neural Network solver for 1D and 2D hyperbolic conservation laws with flexible architectures and slope limiters.
 
 ## Overview
 
-Trains neural networks to solve PDEs of form:
+Trains neural networks to solve PDEs:
 
+**2D form:**
 ```
 u_t + ∂f1(u)/∂x + ∂f2(u)/∂y = ε(u_xx + u_yy)
 ```
 
+**1D form:**
+```
+u_t + ∂f(u)/∂x = ε(u_xx)
+```
+
 Where:
-- `u(x,y,t)` is solution field
-- `f1(u)`, `f2(u)` are flux functions (problem-specific)
+- `u` is solution field
+- `f`, `f1`, `f2` are flux functions (problem-specific)
 - `ε` is viscosity coefficient
 
 Loss = PDE residual loss + initial condition loss.
 
-## Architecture
+## Features
 
-**Network**: 5-layer MLP (20 neurons/layer, ReLU activation)
-- Input: (x, y, t) coordinates
-- Output: u(x, y, t) prediction
+✅ **Flexible architectures** - Separate network from problem definition  
+✅ **1D + 2D support** - Burgers, shocks, Riemann problems  
+✅ **Experiment tracking** - Automatic logging, comparison, metrics DB  
+✅ **Multiple slope limiters** - autograd, MM2, MM3, UNO  
+✅ **Programmatic comparison** - Query best configs, compare architectures  
+✅ **Unified visualization** - Animations, loss plots, comparison tables
 
-**Training**: AdamW optimizer (lr=1e-3), uniform 3D mesh sampling
+## Quick Start
 
-## Slope Limiters
+### Interactive Mode (No Coding Required)
 
-Four residual computation methods:
+```bash
+# Install dependencies
+make install
 
-1. **autograd**: Pure automatic differentiation
-2. **mm2**: MinMod2 limiter (forward/backward differences)
-3. **mm3**: MinMod3 limiter (forward/backward/centered differences)
-4. **uno**: UNO scheme (5-point stencil with second derivatives)
+# Interactive training with prompts
+make train
 
-MinMod limiters reduce spurious oscillations at discontinuities.
+# Generate animations
+make visualize
+
+# Compare experiments
+make compare
+
+# Quick 1D test (100 epochs)
+make test-1d
+```
+
+All scripts prompt for configuration with sensible defaults - just press Enter.
+
+### Programmatic API
+
+```python
+from pinn.core.architectures import NetworkConfig
+from pinn.core.training import Config, train
+from pinn.problems.problems_2d import Riemann2D
+from pinn.experiments.tracker import ExperimentTracker
+
+# Define problem
+problem = Riemann2D()
+
+# Define architecture (flexible!)
+arch = NetworkConfig([50, 50, 50], "tanh")
+model = arch.build()
+
+# Configure training
+config = Config(
+    epsilon=0.0025,
+    n_points=125000,
+    epochs=5000,
+    residual_method="mm2",  # autograd, mm2, mm3, uno
+    optimizer="adamw",
+)
+
+# Train
+model, fig, metrics = train(problem, model, config)
+
+# Log experiment
+tracker = ExperimentTracker()
+exp_id = tracker.log_run(problem, config, arch, model, metrics, fig)
+```
+
+## Comparing Architectures
+
+```python
+from pinn.experiments.tracker import ExperimentTracker
+from pinn.visualization.visualizer import Visualizer
+
+# Query experiments
+tracker = ExperimentTracker()
+df = tracker.compare({"problem_name": "Riemann2D"})
+print(df.sort_values("final_loss"))
+
+# Get best
+best = tracker.get_best(problem="Riemann2D")
+print(f"Best loss: {best['final_loss']:.5e}")
+print(f"Architecture: {best['network_layers']}")
+
+# Visualize
+viz = Visualizer([best["exp_id"]])
+viz.animate_solution_2d(best["exp_id"], problem, steps=200)
+```
 
 ## Problems
 
-Eight test problems defined in `problems_definitions.py`:
+**2D Problems** (`pinn/problems/problems_2d.py`):
+- PeriodicSine2D, Riemann2D, RiemannOblique
+- Shock1D, Rarefaction1D, Pulse
+- BuckleyLeverett, NonLinearNonConvexFlow
 
-| Problem | Domain | f1(u) | f2(u) | Initial Condition |
-|---------|--------|-------|-------|-------------------|
-| **PeriodicSine2D** | [0,1]² × [0,1] | u | u | sin²(πx)sin²(πy) |
-| **Rarefaction1D** | [-6,6] × [-1.5,1.5] × [0,2.5] | u²/2 | u²/2 | -1 (x<0), 1 (x>0) |
-| **Shock1D** | [-6,6] × [-1.5,1.5] × [0,2.5] | u²/2 | u²/2 | 0 (x<0), -1 (x>0) |
-| **Pulse** | [-3,3]² × [0,2.5] | u²/2 | u²/2 | 1 in [0,1]², else 0 |
-| **RiemannOblique** | [0,1]² × [0,0.5] | u²/2 | u²/2 | 4 quadrants: {-1,-0.2,0.5,0.8} |
-| **Riemann2D** | [0,1]² × [0,1/12] | u²/2 | u²/2 | 2 (x<0.25,y<0.25), 3 (x>0.25,y>0.25), else 1 |
-| **BuckleyLeverett** | [-1.5,1.5]² × [0,0.5] | Sw²/(Sw²+μ(1-Sw)²) | f1·(1-Cg(1-Sw)²) | 1 (r<√0.5), else 0 |
-| **NonLinearNonConvexFlow** | [-2,2]² × [0,1] | sin(u) | cos(u) | 0.25π outside, 3.5π inside unit circle |
+**1D Problems** (`pinn/problems/problems_1d.py`):
+- Burgers1D, LinearAdvection1D
+- Shock1DPure, Rarefaction1DPure
 
-## Usage
+## Slope Limiters
 
-Train all problems with all limiters:
+| Method | 1D | 2D | Description |
+|--------|----|----|-------------|
+| `autograd` | ✅ | ✅ | Pure automatic differentiation |
+| `mm2` | ✅ | ✅ | MinMod2 limiter (forward/backward) |
+| `mm3` | ❌ | ✅ | MinMod3 limiter (forward/backward/centered) |
+| `uno` | ❌ | ✅ | UNO scheme (5-point stencil) |
+
+## Available Commands
+
 ```bash
-python -m pinn.run_training
+make help            # Show all commands
+
+# Main workflows
+make train           # Interactive training (1D/2D, all configs)
+make visualize       # Generate animations from results
+make compare         # Compare experiments & export CSV
+
+# Quick tests
+make test-1d         # Quick test all 1D problems (100 epochs)
+make test-compare    # Compare slope limiters on 1D
+
+# Utilities
+make results         # Show experiment summary
+make clean           # Remove cache files
+make clean-results   # Delete all results (careful!)
+```
+
+### Batch Experiments
+
+```bash
+# Run full test suite (all problems, all methods)
+python -m pinn.experiments.run_suite
+
+# Or see programmatic example
+python example_usage.py
 ```
 
 Results saved to `results/`:
-- `model_{hash}.pth` - trained weights
-- `plot_{hash}.png` - loss curve
-- `config_{hash}.json` - hyperparameters
+- `experiments.jsonl` - metrics database (queryable)
+- `model_{id}.pth` - trained weights
+- `plot_{id}.png` - loss curves
+- `videos/` - animations (MP4)
 
-Generate animations:
-```python
-from pinn.plotters.animate import animate_problem
-from pinn.problems_definitions import Riemann2D
+## Project Structure
 
-problem = Riemann2D()
-problem.net.load_state_dict(torch.load("results/model_{hash}.pth"))
-animate_problem(problem, steps=200, hash_id="hash")
+```
+pinn/
+├── core/
+│   ├── problems.py          # Base Problem1D/Problem2D
+│   ├── architectures.py     # NetworkConfig, flexible networks
+│   ├── residuals.py         # All slope limiters (1D+2D)
+│   └── training.py          # Unified train() function
+├── problems/
+│   ├── problems_1d.py       # Burgers, shocks, advection
+│   └── problems_2d.py       # Riemann, BL, etc.
+├── experiments/
+│   ├── tracker.py           # ExperimentTracker (logging + queries)
+│   └── run_suite.py         # Batch runner
+└── visualization/
+    └── visualizer.py        # Unified viz (1D + 2D animations)
 ```
 
-Outputs MP4 to `results/videos/`.
+## Requirements
 
-## Configuration
+- Python 3.11+
+- Poetry (dependency management)
+- FFmpeg (for animations)
 
-Edit `run_training.py` to modify:
-- `epsilons` - viscosity values
-- `n_points` - mesh resolution (cube root gives per-dimension points)
-- `epochs` - training iterations
-- `residuals` - slope limiter methods
+```bash
+# Install FFmpeg (macOS)
+brew install ffmpeg
 
-Default: ε=0.0025, 512k points (80³ mesh), 5000 epochs
+# Install FFmpeg (Ubuntu/Debian)
+sudo apt-get install ffmpeg
+```
 
-## File Structure
+## Migration
 
-- `problems_definitions.py` - Problem classes and PINN network
-- `training.py` - Training loop, mesh generation, Config class
-- `slope_limiters.py` - Residual computation methods (autograd, mm2, mm3, uno)
-- `run_training.py` - Batch runner for all problems/configs
-- `plotters/animate.py` - 3D surface + contour animation generator
-- `plotters/plot_three_times.py` - Multi-timestep visualization
+Upgrading from old API? See [MIGRATION.md](MIGRATION.md) for guide.

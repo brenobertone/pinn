@@ -2,8 +2,9 @@ report/*
 results/*
 .DS_Store
 pinn/__pycache__/*
-pinn/plotters/__pycache__/*
 *.zip
 pictures/*
 videos/*
-results_*
+results_*__pycache__/
+.backup_old_results/
+pinn/*/__pycache__
