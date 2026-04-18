@@ -34,6 +34,29 @@ Loss = PDE residual loss + initial condition loss.
 
 ## Quick Start
 
+### Interactive Mode (No Coding Required)
+
+```bash
+# Install dependencies
+make install
+
+# Interactive training with prompts
+make train
+
+# Generate animations
+make visualize
+
+# Compare experiments
+make compare
+
+# Quick 1D test (100 epochs)
+make test-1d
+```
+
+All scripts prompt for configuration with sensible defaults - just press Enter.
+
+### Programmatic API
+
 ```python
 from pinn.core.architectures import NetworkConfig
 from pinn.core.training import Config, train
@@ -105,21 +128,41 @@ viz.animate_solution_2d(best["exp_id"], problem, steps=200)
 | `mm3` | ❌ | ✅ | MinMod3 limiter (forward/backward/centered) |
 | `uno` | ❌ | ✅ | UNO scheme (5-point stencil) |
 
-## Batch Experiments
+## Available Commands
 
 ```bash
-# Run full test suite
+make help            # Show all commands
+
+# Main workflows
+make train           # Interactive training (1D/2D, all configs)
+make visualize       # Generate animations from results
+make compare         # Compare experiments & export CSV
+
+# Quick tests
+make test-1d         # Quick test all 1D problems (100 epochs)
+make test-compare    # Compare slope limiters on 1D
+
+# Utilities
+make results         # Show experiment summary
+make clean           # Remove cache files
+make clean-results   # Delete all results (careful!)
+```
+
+### Batch Experiments
+
+```bash
+# Run full test suite (all problems, all methods)
 python -m pinn.experiments.run_suite
 
-# Or see example
+# Or see programmatic example
 python example_usage.py
 ```
 
-Results → `results/`:
-- `experiments.jsonl` - metrics database
+Results saved to `results/`:
+- `experiments.jsonl` - metrics database (queryable)
 - `model_{id}.pth` - trained weights
 - `plot_{id}.png` - loss curves
-- `videos/` - animations
+- `videos/` - animations (MP4)
 
 ## Project Structure
 
@@ -138,6 +181,20 @@ pinn/
 │   └── run_suite.py         # Batch runner
 └── visualization/
     └── visualizer.py        # Unified viz (1D + 2D animations)
+```
+
+## Requirements
+
+- Python 3.11+
+- Poetry (dependency management)
+- FFmpeg (for animations)
+
+```bash
+# Install FFmpeg (macOS)
+brew install ffmpeg
+
+# Install FFmpeg (Ubuntu/Debian)
+sudo apt-get install ffmpeg
 ```
 
 ## Migration

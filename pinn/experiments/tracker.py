@@ -139,5 +139,5 @@ class ExperimentTracker:
     ) -> torch.nn.Module:
         model = network_config.build()
         model_path = self.results_dir / f"model_{exp_id}.pth"
-        model.load_state_dict(torch.load(model_path))
+        model.load_state_dict(torch.load(model_path, weights_only=True))
         return model
