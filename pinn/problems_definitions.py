@@ -11,15 +11,15 @@ class PINN(nn.Module):
         super(PINN, self).__init__()
         self.net = nn.Sequential(
             nn.Linear(n_inputs, 20),
-            nn.Tanh(),
+            nn.ReLU(),
             nn.Linear(20, 20),
-            nn.Tanh(),
+            nn.ReLU(),
             nn.Linear(20, 20),
-            nn.Tanh(),
+            nn.ReLU(),
             nn.Linear(20, 20),
-            nn.Tanh(),
+            nn.ReLU(),
             nn.Linear(20, 20),
-            nn.Tanh(),
+            nn.ReLU(),
             nn.Linear(20, n_outputs),
         )
 
@@ -68,7 +68,7 @@ class Problem(ABC):
 class PeriodicSine2D(Problem):
     x_bounds = (0.0, 1.0)
     y_bounds = (0.0, 1.0)
-    t_bounds = (0.0, 4 * 1.0)
+    t_bounds = (0.0, 1.0)
     name = "PeriodicSine2D"
     net = PINN(n_inputs=3, n_outputs=1)
     x_orientation = "decrescent"
@@ -91,7 +91,7 @@ class PeriodicSine2D(Problem):
 class Rarefaction1D(Problem):
     x_bounds = (-6.0, 6.0)
     y_bounds = (-1.5, 1.5)
-    t_bounds = (0.0, 4 * 2.5)
+    t_bounds = (0.0, 2.5)
     name = "Rarefaction1D"
     net = PINN(n_inputs=3, n_outputs=1)
 
@@ -115,7 +115,7 @@ class Rarefaction1D(Problem):
 class Shock1D(Problem):
     x_bounds = (-6.0, 6.0)
     y_bounds = (-1.5, 1.5)
-    t_bounds = (0.0, 4 * 2.5)
+    t_bounds = (0.0, 2.5)
     name = "Shock1D"
     net = PINN(n_inputs=3, n_outputs=1)
 
@@ -139,7 +139,7 @@ class Shock1D(Problem):
 class Pulse(Problem):
     x_bounds = (-3.0, 3.0)
     y_bounds = (-3, 3)
-    t_bounds = (0.0, 10)
+    t_bounds = (0.0, 2.5)
     name = "Pulse"
     net = PINN(n_inputs=3, n_outputs=1)
 
@@ -166,7 +166,7 @@ class Pulse(Problem):
 class RiemannOblique(Problem):
     x_bounds = (0.0, 1.0)
     y_bounds = (0.0, 1.0)
-    t_bounds = (0.0, 4 * 0.5)
+    t_bounds = (0.0, 0.5)
     name = "RiemannOblique"
     net = PINN(n_inputs=3, n_outputs=1)
     x_orientation = "decrescent"
@@ -194,7 +194,7 @@ class RiemannOblique(Problem):
 class Riemann2D(Problem):
     x_bounds = (0.0, 1.0)
     y_bounds = (0.0, 1.0)
-    t_bounds = (0.0, 4 * 1.0 / 12.0)
+    t_bounds = (0.0, 1.0 / 12.0)
     name = "Riemann2D"
     net = PINN(n_inputs=3, n_outputs=1)
 
@@ -218,7 +218,7 @@ class Riemann2D(Problem):
 class BuckleyLeverett(Problem):
     x_bounds = (-1.5, 1.5)
     y_bounds = (-1.5, 1.5)
-    t_bounds = (0.0, 4 * 0.5)
+    t_bounds = (0.0, 0.5)
     name = "BuckleyLeverett"
     net = PINN(n_inputs=3, n_outputs=1)
 
@@ -247,7 +247,7 @@ class BuckleyLeverett(Problem):
 class NonLinearNonConvexFlow(Problem):
     x_bounds = (-2.0, 2.0)
     y_bounds = (-2.0, 2.0)
-    t_bounds = (0.0, 4 * 1.0)
+    t_bounds = (0.0, 1.0)
     name = "NonLinearNonConvexFlow"
     net = PINN(n_inputs=3, n_outputs=1)
 

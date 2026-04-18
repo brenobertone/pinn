@@ -64,17 +64,7 @@ def train(problem: Problem, config: Config) -> tuple[PINN, Figure]:
 
     model = problem.net
     model.to(device)
-    optimizer = torch.optim.RMSprop(model.parameters(), lr=1e-3)
-
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer,
-        mode="min",
-        factor=0.8,
-        patience=500,
-        threshold=1e-5,
-        cooldown=50,
-        min_lr=1e-6,
-    )
+    optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
 
     xyt_f = uniform_mesh(
         config.n_points,
@@ -116,7 +106,6 @@ def train(problem: Problem, config: Config) -> tuple[PINN, Figure]:
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-        scheduler.step(loss_f.item())
 
         if epoch % 5000 == 0:
             elapsed = time.time() - start_training

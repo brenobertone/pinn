@@ -32,6 +32,27 @@ def get_config_hash(problem: Problem, config: Config) -> str:
     return hashlib.md5(config_str.encode()).hexdigest()
 
 
+def find_config_hash(
+    query: dict[str, object], folder: str = "results"
+) -> str | None:
+    """
+    Search for a config file in `folder` that matches all key-value pairs in `query`.
+    Returns the hash_id if found, else None.
+    """
+    folder_path = Path(folder)
+    for file in folder_path.glob("config_*.json"):
+        with file.open("r", encoding="utf-8") as f:
+            try:
+                data = json.load(f)
+            except json.JSONDecodeError:
+                continue
+
+        if all(data.get(k) == v for k, v in query.items()):
+            # Extract hash_id from filename
+            return file.stem.replace("config_", "")
+    return None
+
+
 if __name__ == "__main__":
     matplotlib.use("Agg")
 
@@ -47,8 +68,8 @@ if __name__ == "__main__":
     ]
 
     epsilons = [0.0025]
-    n_points = [128000, 256000, 512000, 1024000]
-    epochs = [15000]
+    n_points = [512000]
+    epochs = [5000]
     residuals = [
         advection_residual_autograd,
         advection_residual_mm2,

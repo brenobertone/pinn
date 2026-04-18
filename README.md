@@ -1,122 +1,95 @@
-# README — Experimentos PINN / Weak-PINN
+# IC-PINN
 
-Repositório para experimentar PINNs com *viscous regularization* e variantes com *slope limiters* (MM2, MM3, UNO). Implementação em PyTorch; treino baseado em minimizar o residual físico + condição inicial. A teoria está no relatório `relatorio.pdf`.
+Physics-Informed Neural Network solver for 2D hyperbolic conservation laws with slope limiters.
 
----
+## Overview
 
-## Estrutura de arquivos
-- `problems_definitions.py` — definições das classes `Problem` (ex.: `Riemann2D`, `Shock1D`, ...) e da rede `PINN` usada para aproximar \(u(x,y,t)\). Declara domínio, condição inicial e fluxos `f1`, `f2`. 
-- `training.py` — rotina de treino principal: geração de malha (`uniform_mesh`), criação de `Config` (ε, n_points, epochs, residual), loop de treino (RMSprop + scheduler) e funções auxiliares de plot. Função principal: `train(problem, config, device)`.  
-- `slope_limiters.py` — implementa diferenças finitas com limitadores de inclinação: `mm2`, `mm3`, `uno` e residuais que usam essas discretizações (alternativa ao `autograd`).  
+Trains neural networks to solve PDEs of form:
 
----
-
-## O que o código faz — algoritmo geral
-
-### 1. Definir problema
-
-```python
-class PeriodicSine2D(Problem):
-    x_bounds = (0.0, 1.0)
-    y_bounds = (0.0, 1.0)
-    t_bounds = (0.0, 4 * 1.0)
-    name = "PeriodicSine2D"
-    net = PINN(n_inputs=3, n_outputs=1)
-    x_orientation = "decrescent"
-    y_orientation = "decrescent"
-
-    @staticmethod
-    def f1(u):
-        return u
-
-    @staticmethod
-    def f2(u):
-        return u
-
-    def initial_condition(
-        self, x: torch.Tensor, y: torch.Tensor
-    ) -> torch.Tensor:
-        return (torch.sin(np.pi * x) ** 2) * (torch.sin(np.pi * y) ** 2)
+```
+u_t + ∂f1(u)/∂x + ∂f2(u)/∂y = ε(u_xx + u_yy)
 ```
 
-### 2. Definir parâmetros do treinamento
-    - número de pontos N a ser usado
-    - learning_rate
-    - epochs
-    - optimizer
-    - scheduler
-    - resíduo a ser usado (advection_residual_autograd, advection_residual_mm2, advection_residual_mm3, advection_residual_uno)
+Where:
+- `u(x,y,t)` is solution field
+- `f1(u)`, `f2(u)` are flux functions (problem-specific)
+- `ε` is viscosity coefficient
 
+Loss = PDE residual loss + initial condition loss.
 
-### 3. Sampling de pontos
+## Architecture
 
-Feito com malha uniforme, selecionando N^(1/3) pontos em cada um dos eixos x, y, t, e uma padding de no mínimo 2 pontos, afim de permitir o cálculo de derivadas usando diferenças finitas
+**Network**: 5-layer MLP (20 neurons/layer, ReLU activation)
+- Input: (x, y, t) coordinates
+- Output: u(x, y, t) prediction
 
-### 4. Iterações de treinamento
+**Training**: AdamW optimizer (lr=1e-3), uniform 3D mesh sampling
 
-Para cada uma das épocas, calculamos o resíduo e 
+## Slope Limiters
 
-```python
-f = config.residual(model, problem, xyt_f)
-loss_f = torch.mean(f**2)
+Four residual computation methods:
 
-u_pred_ic = model(xyt_ic)
-loss_ic = torch.mean((u_pred_ic - u0) ** 2)
+1. **autograd**: Pure automatic differentiation
+2. **mm2**: MinMod2 limiter (forward/backward differences)
+3. **mm3**: MinMod3 limiter (forward/backward/centered differences)
+4. **uno**: UNO scheme (5-point stencil with second derivatives)
+
+MinMod limiters reduce spurious oscillations at discontinuities.
+
+## Problems
+
+Eight test problems defined in `problems_definitions.py`:
+
+| Problem | Domain | f1(u) | f2(u) | Initial Condition |
+|---------|--------|-------|-------|-------------------|
+| **PeriodicSine2D** | [0,1]² × [0,1] | u | u | sin²(πx)sin²(πy) |
+| **Rarefaction1D** | [-6,6] × [-1.5,1.5] × [0,2.5] | u²/2 | u²/2 | -1 (x<0), 1 (x>0) |
+| **Shock1D** | [-6,6] × [-1.5,1.5] × [0,2.5] | u²/2 | u²/2 | 0 (x<0), -1 (x>0) |
+| **Pulse** | [-3,3]² × [0,2.5] | u²/2 | u²/2 | 1 in [0,1]², else 0 |
+| **RiemannOblique** | [0,1]² × [0,0.5] | u²/2 | u²/2 | 4 quadrants: {-1,-0.2,0.5,0.8} |
+| **Riemann2D** | [0,1]² × [0,1/12] | u²/2 | u²/2 | 2 (x<0.25,y<0.25), 3 (x>0.25,y>0.25), else 1 |
+| **BuckleyLeverett** | [-1.5,1.5]² × [0,0.5] | Sw²/(Sw²+μ(1-Sw)²) | f1·(1-Cg(1-Sw)²) | 1 (r<√0.5), else 0 |
+| **NonLinearNonConvexFlow** | [-2,2]² × [0,1] | sin(u) | cos(u) | 0.25π outside, 3.5π inside unit circle |
+
+## Usage
+
+Train all problems with all limiters:
+```bash
+python -m pinn.run_training
 ```
 
-#### 4.1 Cálculo do resíduo
+Results saved to `results/`:
+- `model_{hash}.pth` - trained weights
+- `plot_{hash}.png` - loss curve
+- `config_{hash}.json` - hyperparameters
 
-Entrada:
-    model    ← rede PINN
-    problem  ← funções f1, f2
-    xyt      ← malha de pontos [Nx, Ny, Nt, 3]
-    epsilon  ← coef. de difusão
-
-Saída:
-    residual ← resíduo da PDE em cada ponto da malha
-
-Passos:
-
-1. Extrair espaçamentos da malha:
-    dx, dy, dt ← diferenças em x, y, t
-
-2. Avaliar modelo na malha:
-    u ← model(xyt)  # reshape para [Nx, Ny, Nt]
-
-3. Definir operador de diferenças finitas (diff_ops_mm2):
-    - Calcular derivadas forward/backward em x, y, t
-    - Combinar com mm2 → derivadas de 1ª ordem (u_x, u_y, u_t)
-    - Usar diferença central → derivadas de 2ª ordem (u_xx, u_yy)
-
-4. Aplicar operador em:
-    - u → obter u_t, u_xx, u_yy
-    - f1(u) → obter f1_u_x
-    - f2(u) → obter f2_u_y
-
-5. Montar resíduo da equação de advecção-difusão:
-    residual ← u_t + f1_u_x + f2_u_y - epsilon * (u_xx + u_yy)
-
-6. Retornar residual
-
-
-# Exemplo míninmo
-
+Generate animations:
 ```python
-from typing import Tuple
-import torch
-from problems_definitions import PeriodicSine2D
-from training import Config, train
-from slope_limiters import advection_residual_mm2
+from pinn.plotters.animate import animate_problem
+from pinn.problems_definitions import Riemann2D
 
-device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+problem = Riemann2D()
+problem.net.load_state_dict(torch.load("results/model_{hash}.pth"))
+animate_problem(problem, steps=200, hash_id="hash")
+```
 
-problem = PeriodicSine2D()
-config = Config(
-    epsilon=0.0025,
-    n_points=125,   # 5^3 => Nx=Ny=Nt=5
-    epochs=20000,
-    residual=advection_residual_mm2,
-)
+Outputs MP4 to `results/videos/`.
 
-model, fig = train(problem, config, device)
-fig.savefig("loss_history.png")
+## Configuration
+
+Edit `run_training.py` to modify:
+- `epsilons` - viscosity values
+- `n_points` - mesh resolution (cube root gives per-dimension points)
+- `epochs` - training iterations
+- `residuals` - slope limiter methods
+
+Default: ε=0.0025, 512k points (80³ mesh), 5000 epochs
+
+## File Structure
+
+- `problems_definitions.py` - Problem classes and PINN network
+- `training.py` - Training loop, mesh generation, Config class
+- `slope_limiters.py` - Residual computation methods (autograd, mm2, mm3, uno)
+- `run_training.py` - Batch runner for all problems/configs
+- `plotters/animate.py` - 3D surface + contour animation generator
+- `plotters/plot_three_times.py` - Multi-timestep visualization

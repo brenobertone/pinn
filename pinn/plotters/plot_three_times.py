@@ -81,7 +81,7 @@ def plot_three_times(
     plt.tight_layout()
 
     # Save figure
-    save_path = Path("pictures")
+    save_path = Path("results/pictures")
     save_path.mkdir(exist_ok=True, parents=True)
     fig.savefig(save_path / f"plot_three_times_{hash_id}.png", dpi=150)
 

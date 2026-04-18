@@ -88,7 +88,7 @@ def animate_problem(
 
     anim = FuncAnimation(fig, update, frames=len(t_vals), blit=False)
 
-    save_path = Path("videos")
+    save_path = Path("results/videos")
     save_path.mkdir(exist_ok=True, parents=True)
     anim.save(
         save_path / f"animate_problem_{hash_id}.mp4",
