@@ -1,13 +1,11 @@
-# Legacy compatibility
-import warnings
+"""
+IC-PINN: Physics-Informed Neural Networks for Conservation Laws
 
-warnings.filterwarnings("default", category=DeprecationWarning, module="pinn")
+Main modules:
+- pinn.core: Base classes (problems, architectures, residuals, training)
+- pinn.problems: Concrete 1D and 2D problems
+- pinn.experiments: Experiment tracking and comparison
+- pinn.visualization: Animation and visualization tools
+"""
 
-# Old imports still work but warn
-from . import problems_definitions, slope_limiters, training
-
-warnings.warn(
-    "Direct imports from pinn are deprecated. Use pinn.core, pinn.problems, pinn.experiments instead.",
-    DeprecationWarning,
-    stacklevel=2,
-)
+__version__ = "0.1.0"
