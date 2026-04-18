@@ -6,4 +6,4 @@ pinn/plotters/__pycache__/*
 *.zip
 pictures/*
 videos/*
-results_*
+results_*__pycache__/
