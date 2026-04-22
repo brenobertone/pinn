@@ -8,6 +8,7 @@ import sys
 
 from pinn.experiments.tracker import ExperimentTracker
 from pinn.problems.problems_1d import (
+    AdvectionTanh1D,
     Burgers1D,
     LinearAdvection1D,
     Rarefaction1DPure,
@@ -65,6 +66,7 @@ def main():
         "Shock1DPure": Shock1DPure(),
         "Rarefaction1DPure": Rarefaction1DPure(),
         "LinearAdvection1D": LinearAdvection1D(),
+        "AdvectionTanh1D": AdvectionTanh1D(),
     }
 
     problem_map_2d = {

@@ -10,6 +10,7 @@ from pinn.core.architectures import NetworkConfig
 from pinn.core.training import Config, train
 from pinn.experiments.tracker import ExperimentTracker
 from pinn.problems.problems_1d import (
+    AdvectionTanh1D,
     Burgers1D,
     LinearAdvection1D,
     Rarefaction1DPure,
@@ -94,6 +95,7 @@ def main():
             ("Shock1DPure", Shock1DPure),
             ("Rarefaction1DPure", Rarefaction1DPure),
             ("LinearAdvection1D", LinearAdvection1D),
+            ("AdvectionTanh1D", AdvectionTanh1D),
         ]
         problem_names = [p[0] for p in problems_1d]
         selected = get_multi_choice(

@@ -183,6 +183,44 @@ pinn/
     └── visualizer.py        # Unified viz (1D + 2D animations)
 ```
 
+## Adding New Problems
+
+To add custom problem to interactive scripts:
+
+**1. Define problem class** in `pinn/problems/problems_1d.py` or `problems_2d.py`:
+
+```python
+class AdvectionTanh1D(Problem1D):
+    x_bounds = (-5.0, 5.0)
+    t_bounds = (0.0, 2.0)
+    name = "AdvectionTanh1D"
+
+    @staticmethod
+    def f(u):
+        return u  # flux function
+
+    def initial_condition(self, x: torch.Tensor) -> torch.Tensor:
+        # u(x,0) = sum c_j tanh(alpha_j * x + beta_j)
+        c = [1.0, -0.5, 0.8]
+        alpha = [0.5, 1.0, 0.3]
+        beta = [0.0, 2.0, -1.5]
+        
+        u = torch.zeros_like(x)
+        for cj, aj, bj in zip(c, alpha, beta):
+            u += cj * torch.tanh(aj * x + bj)
+        return u
+```
+
+**2. Register in `train_interactive.py`**:
+- Add import: `from pinn.problems.problems_1d import AdvectionTanh1D`
+- Add to problem list: `("AdvectionTanh1D", AdvectionTanh1D)`
+
+**3. Register in `visualize_interactive.py`**:
+- Add import: `from pinn.problems.problems_1d import AdvectionTanh1D`
+- Add to problem_map: `"AdvectionTanh1D": AdvectionTanh1D()`
+
+Now available in `make train` and `make visualize`.
+
 ## Requirements
 
 - Python 3.11+

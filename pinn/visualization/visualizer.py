@@ -85,6 +85,7 @@ class Visualizer:
         x_plot = np.linspace(problem.x_bounds[0], problem.x_bounds[1], 200)
         t_vals = np.linspace(problem.t_bounds[0], problem.t_bounds[1], steps)
 
+        # Compute PINN solution
         u_vals_list = []
         for t in t_vals:
             T = np.full_like(x_plot, t)
@@ -96,20 +97,65 @@ class Visualizer:
             u_vals_list.append(u)
 
         u_vals = np.array(u_vals_list)
-        u_min, u_max = np.min(u_vals), np.max(u_vals)
+
+        # Check if benchmark solution exists
+        has_benchmark = False
+        u_benchmark_vals = None
+        try:
+            x_tensor = torch.tensor(x_plot, dtype=torch.float32)
+            t_test = torch.tensor([t_vals[0]], dtype=torch.float32)
+            problem.benchmark_solution(x_tensor, t_test)
+            has_benchmark = True
+
+            # Compute benchmark solution
+            u_benchmark_list = []
+            for t in t_vals:
+                t_tensor = torch.full((len(x_plot),), t, dtype=torch.float32)
+                u_bench = (
+                    problem.benchmark_solution(x_tensor, t_tensor)
+                    .cpu()
+                    .numpy()
+                    .flatten()
+                )
+                u_benchmark_list.append(u_bench)
+            u_benchmark_vals = np.array(u_benchmark_list)
+        except NotImplementedError:
+            pass
+
+        # Determine y-axis limits
+        if has_benchmark:
+            all_vals = np.concatenate([u_vals.flatten(), u_benchmark_vals.flatten()])
+            u_min, u_max = np.min(all_vals), np.max(all_vals)
+        else:
+            u_min, u_max = np.min(u_vals), np.max(u_vals)
 
         fig, ax = plt.subplots(figsize=(10, 6))
-        (line,) = ax.plot(x_plot, u_vals[0])
+        (line_pinn,) = ax.plot(x_plot, u_vals[0], "b-", label="PINN", linewidth=2)
+        if has_benchmark:
+            (line_bench,) = ax.plot(
+                x_plot,
+                u_benchmark_vals[0],
+                "r--",
+                label="Benchmark",
+                linewidth=2,
+            )
         ax.set_xlim(problem.x_bounds)
         ax.set_ylim(u_min - 0.1, u_max + 0.1)
         ax.set_xlabel("x")
         ax.set_ylabel("u")
         ax.grid(True)
+        ax.legend()
 
         def update(frame):
-            line.set_ydata(u_vals[frame])
-            ax.set_title(f"{problem.name} - t = {t_vals[frame]:.3f}")
-            return (line,)
+            line_pinn.set_ydata(u_vals[frame])
+            title = f"{problem.name} - t = {t_vals[frame]:.3f}"
+            if has_benchmark and problem.benchmark_source:
+                title += f"\nBenchmark: {problem.benchmark_source}"
+            ax.set_title(title)
+            if has_benchmark:
+                line_bench.set_ydata(u_benchmark_vals[frame])
+                return line_pinn, line_bench
+            return (line_pinn,)
 
         anim = FuncAnimation(fig, update, frames=len(t_vals), blit=True)
 

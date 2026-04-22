@@ -27,6 +27,7 @@ class Problem1D(Problem):
     x_bounds: tuple[float, float]
     f: Callable
     x_orientation: str = "crescent"
+    benchmark_source: str | None = None
 
     def __init_subclass__(cls):
         super().__init_subclass__()
@@ -42,6 +43,10 @@ class Problem1D(Problem):
     @abstractmethod
     def initial_condition(self, x: torch.Tensor) -> torch.Tensor: ...
 
+    def benchmark_solution(self, x: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
+        """Analytical or high-accuracy benchmark solution for comparison."""
+        raise NotImplementedError("Benchmark solution not implemented")
+
     def boundary_condition(self, xt: torch.Tensor) -> torch.Tensor:
         raise NotImplementedError("Boundary condition not implemented")
 
@@ -54,6 +59,7 @@ class Problem2D(Problem):
     f2: Callable
     x_orientation: str = "crescent"
     y_orientation: str = "crescent"
+    benchmark_source: str | None = None
 
     def __init_subclass__(cls):
         super().__init_subclass__()
@@ -70,6 +76,12 @@ class Problem2D(Problem):
     def initial_condition(
         self, x: torch.Tensor, y: torch.Tensor
     ) -> torch.Tensor: ...
+
+    def benchmark_solution(
+        self, x: torch.Tensor, y: torch.Tensor, t: torch.Tensor
+    ) -> torch.Tensor:
+        """Analytical or high-accuracy benchmark solution for comparison."""
+        raise NotImplementedError("Benchmark solution not implemented")
 
     def boundary_condition(self, xyt: torch.Tensor) -> torch.Tensor:
         raise NotImplementedError("Boundary condition not implemented")
