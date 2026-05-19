@@ -1,6 +1,7 @@
 import torch
+import torch.nn as nn
 
-from .problems_definitions import PINN, Problem
+from pinn.core.problems import Problem1D, Problem2D
 
 PADDING = 2
 
@@ -27,9 +28,90 @@ def mm3(x, y, z):
     )
 
 
-def advection_residual_autograd(
-    model: PINN,
-    problem: Problem,
+# 1D Residuals
+def residual_1d_autograd(
+    model: nn.Module,
+    problem: Problem1D,
+    xt: torch.Tensor,
+    epsilon: float,
+) -> torch.Tensor:
+    xt = xt.reshape(-1, 2)
+    xt.requires_grad_(True)
+    u = model(xt)
+
+    grads = torch.autograd.grad(u, xt, torch.ones_like(u), create_graph=True)[0]
+    u_x = grads[:, 0:1]
+    u_t = grads[:, 1:2]
+
+    f_u_x = torch.autograd.grad(
+        problem.f(u), xt, torch.ones_like(u), create_graph=True
+    )[0][:, 0:1]
+
+    u_xx = torch.autograd.grad(
+        u_x, xt, torch.ones_like(u_x), create_graph=True
+    )[0][:, 0:1]
+
+    return u_t + f_u_x - epsilon * u_xx
+
+
+def diff_ops_1d_mm2(
+    u: torch.Tensor, deltas: list[float], Ns: list[int], PADDING: int = 1
+):
+    dx, dt = deltas
+    Nx, Nt = Ns
+    Nx -= 2 * PADDING
+    Nt -= 2 * PADDING
+
+    shape_inner = (Nx, Nt)
+    u_x = torch.zeros(shape_inner, device=u.device)
+    u_t = torch.zeros(shape_inner, device=u.device)
+    u_xx = torch.zeros(shape_inner, device=u.device)
+
+    xs = slice(PADDING, Nx + PADDING)
+    ts = slice(PADDING, Nt + PADDING)
+
+    u_x_forward = (u[xs.start + 1 : xs.stop + 1, ts] - u[xs, ts]) / dx
+    u_x_backward = (u[xs, ts] - u[xs.start - 1 : xs.stop - 1, ts]) / dx
+    u_t_forward = (u[xs, ts.start + 1 : ts.stop + 1] - u[xs, ts]) / dt
+    u_t_backward = (u[xs, ts] - u[xs, ts.start - 1 : ts.stop - 1]) / dt
+
+    u_x[:] = mm2(u_x_forward, u_x_backward)
+    u_t[:] = mm2(u_t_forward, u_t_backward)
+
+    u_xx[:] = (
+        u[xs.start + 1 : xs.stop + 1, ts]
+        - 2 * u[xs, ts]
+        + u[xs.start - 1 : xs.stop - 1, ts]
+    ) / dx**2
+
+    return u_x, u_t, u_xx
+
+
+def residual_1d_mm2(
+    model: nn.Module,
+    problem: Problem1D,
+    xt: torch.Tensor,
+    epsilon: float,
+) -> torch.Tensor:
+    dx = (xt[1, 0, 0] - xt[0, 0, 0]).item()
+    dt = (xt[0, 1, 1] - xt[0, 0, 1]).item()
+    deltas = [dx, dt]
+
+    Nx, Nt, _ = xt.shape
+    Ns = [Nx, Nt]
+    u = model(xt.reshape(-1, 2))
+    u = u.view(Nx, Nt)
+
+    _, u_t, u_xx = diff_ops_1d_mm2(u, deltas, Ns)
+    f_u_x, _, _ = diff_ops_1d_mm2(problem.f(u), deltas, Ns)
+
+    return u_t + f_u_x - epsilon * u_xx
+
+
+# 2D Residuals
+def residual_2d_autograd(
+    model: nn.Module,
+    problem: Problem2D,
     xyt: torch.Tensor,
     epsilon: float,
 ) -> torch.Tensor:
@@ -61,7 +143,7 @@ def advection_residual_autograd(
     return u_t + f1_u_x + f2_u_y - epsilon * (u_xx + u_yy)
 
 
-def diff_ops_mm2(
+def diff_ops_2d_mm2(
     u: torch.Tensor, deltas: list[float], Ns: list[int], PADDING: int = 1
 ):
     dx, dy, dt = deltas
@@ -106,9 +188,9 @@ def diff_ops_mm2(
     return u_x, u_y, u_t, u_xx, u_yy
 
 
-def advection_residual_mm2(
-    model: PINN,
-    problem: Problem,
+def residual_2d_mm2(
+    model: nn.Module,
+    problem: Problem2D,
     xyt: torch.Tensor,
     epsilon: float,
 ) -> torch.Tensor:
@@ -123,14 +205,14 @@ def advection_residual_mm2(
     u = model(xyt.reshape(-1, 3))
     u = u.view(Nx, Ny, Nt)
 
-    _, _, u_t, u_xx, u_yy = diff_ops_mm2(u, deltas, Ns)
-    f1_u_x, _, _, _, _ = diff_ops_mm2(problem.f1(u), deltas, Ns)
-    _, f2_u_y, _, _, _ = diff_ops_mm2(problem.f2(u), deltas, Ns)
+    _, _, u_t, u_xx, u_yy = diff_ops_2d_mm2(u, deltas, Ns)
+    f1_u_x, _, _, _, _ = diff_ops_2d_mm2(problem.f1(u), deltas, Ns)
+    _, f2_u_y, _, _, _ = diff_ops_2d_mm2(problem.f2(u), deltas, Ns)
 
     return u_t + f1_u_x + f2_u_y - epsilon * (u_xx + u_yy)
 
 
-def diff_ops_mm3(
+def diff_ops_2d_mm3(
     u: torch.Tensor, deltas: list[float], Ns: list[int], PADDING: int = 1
 ):
     dx, dy, dt = deltas
@@ -189,9 +271,9 @@ def diff_ops_mm3(
     return u_x, u_y, u_t, u_xx, u_yy
 
 
-def advection_residual_mm3(
-    model: PINN,
-    problem: Problem,
+def residual_2d_mm3(
+    model: nn.Module,
+    problem: Problem2D,
     xyt: torch.Tensor,
     epsilon: float,
 ) -> torch.Tensor:
@@ -206,14 +288,14 @@ def advection_residual_mm3(
     u = model(xyt.reshape(-1, 3))
     u = u.view(Nx, Ny, Nt)
 
-    _, _, u_t, u_xx, u_yy = diff_ops_mm3(u, deltas, Ns)
-    f1_u_x, _, _, _, _ = diff_ops_mm3(problem.f1(u), deltas, Ns)
-    _, f2_u_y, _, _, _ = diff_ops_mm3(problem.f2(u), deltas, Ns)
+    _, _, u_t, u_xx, u_yy = diff_ops_2d_mm3(u, deltas, Ns)
+    f1_u_x, _, _, _, _ = diff_ops_2d_mm3(problem.f1(u), deltas, Ns)
+    _, f2_u_y, _, _, _ = diff_ops_2d_mm3(problem.f2(u), deltas, Ns)
 
     return u_t + f1_u_x + f2_u_y - epsilon * (u_xx + u_yy)
 
 
-def diff_ops_uno(
+def diff_ops_2d_uno(
     u: torch.Tensor, deltas: list[float], Ns: list[int], PADDING: int = 2
 ):
     dx, dy, dt = deltas
@@ -291,9 +373,9 @@ def diff_ops_uno(
     return u_x, u_y, u_t, u_xx, u_yy
 
 
-def advection_residual_uno(
-    model: PINN,
-    problem: Problem,
+def residual_2d_uno(
+    model: nn.Module,
+    problem: Problem2D,
     xyt: torch.Tensor,
     epsilon: float,
 ) -> torch.Tensor:
@@ -307,8 +389,8 @@ def advection_residual_uno(
     u = model(xyt.reshape(-1, 3))
     u = u.view(Nx, Ny, Nt)
 
-    _, _, u_t, u_xx, u_yy = diff_ops_uno(u, deltas, Ns)
-    f1_u_x, _, _, _, _ = diff_ops_uno(problem.f1(u), deltas, Ns)
-    _, f2_u_y, _, _, _ = diff_ops_uno(problem.f2(u), deltas, Ns)
+    _, _, u_t, u_xx, u_yy = diff_ops_2d_uno(u, deltas, Ns)
+    f1_u_x, _, _, _, _ = diff_ops_2d_uno(problem.f1(u), deltas, Ns)
+    _, f2_u_y, _, _, _ = diff_ops_2d_uno(problem.f2(u), deltas, Ns)
 
     return u_t + f1_u_x + f2_u_y - epsilon * (u_xx + u_yy)

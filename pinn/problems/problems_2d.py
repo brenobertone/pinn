@@ -1,76 +1,14 @@
-from abc import ABC, abstractmethod
-from typing import Callable
-
 import numpy as np
 import torch
-import torch.nn as nn
+
+from pinn.core.problems import Problem2D
 
 
-class PINN(nn.Module):
-    def __init__(self, n_inputs=3, n_outputs=1):
-        super(PINN, self).__init__()
-        self.net = nn.Sequential(
-            nn.Linear(n_inputs, 20),
-            nn.ReLU(),
-            nn.Linear(20, 20),
-            nn.ReLU(),
-            nn.Linear(20, 20),
-            nn.ReLU(),
-            nn.Linear(20, 20),
-            nn.ReLU(),
-            nn.Linear(20, 20),
-            nn.ReLU(),
-            nn.Linear(20, n_outputs),
-        )
-
-    def forward(self, xyt: torch.Tensor) -> torch.Tensor:
-        return self.net(xyt)
-
-
-class Problem(ABC):
-    name: str
-    x_bounds: tuple[float, float]
-    y_bounds: tuple[float, float]
-    t_bounds: tuple[float, float]
-    f1: Callable
-    f2: Callable
-
-    net: PINN
-    x_orientation: str = "crescent"
-    y_orientation: str = "crescent"
-
-    def __init_subclass__(cls):
-        super().__init_subclass__()
-        required_attrs = [
-            "x_bounds",
-            "y_bounds",
-            "t_bounds",
-            "name",
-            "net",
-            "f1",
-            "f2",
-        ]
-        for attr in required_attrs:
-            if not hasattr(cls, attr):
-                raise TypeError(
-                    f"Class '{cls.__name__}' is missing attribute: '{attr}'"
-                )
-
-    @abstractmethod
-    def initial_condition(
-        self, x: torch.Tensor, y: torch.Tensor
-    ) -> torch.Tensor: ...
-
-    def boundary_condition(self, xyt: torch.Tensor) -> torch.Tensor:
-        raise NotImplementedError("Boundary condition not implemented")
-
-
-class PeriodicSine2D(Problem):
+class PeriodicSine2D(Problem2D):
     x_bounds = (0.0, 1.0)
     y_bounds = (0.0, 1.0)
     t_bounds = (0.0, 1.0)
     name = "PeriodicSine2D"
-    net = PINN(n_inputs=3, n_outputs=1)
     x_orientation = "decrescent"
     y_orientation = "decrescent"
 
@@ -88,12 +26,11 @@ class PeriodicSine2D(Problem):
         return (torch.sin(np.pi * x) ** 2) * (torch.sin(np.pi * y) ** 2)
 
 
-class Rarefaction1D(Problem):
+class Rarefaction1D(Problem2D):
     x_bounds = (-6.0, 6.0)
     y_bounds = (-1.5, 1.5)
     t_bounds = (0.0, 2.5)
     name = "Rarefaction1D"
-    net = PINN(n_inputs=3, n_outputs=1)
 
     @staticmethod
     def f1(u):
@@ -112,12 +49,11 @@ class Rarefaction1D(Problem):
         return u
 
 
-class Shock1D(Problem):
+class Shock1D(Problem2D):
     x_bounds = (-6.0, 6.0)
     y_bounds = (-1.5, 1.5)
     t_bounds = (0.0, 2.5)
     name = "Shock1D"
-    net = PINN(n_inputs=3, n_outputs=1)
 
     @staticmethod
     def f1(u):
@@ -136,12 +72,11 @@ class Shock1D(Problem):
         return u
 
 
-class Pulse(Problem):
+class Pulse(Problem2D):
     x_bounds = (-3.0, 3.0)
     y_bounds = (-3, 3)
     t_bounds = (0.0, 2.5)
     name = "Pulse"
-    net = PINN(n_inputs=3, n_outputs=1)
 
     @staticmethod
     def f1(u):
@@ -163,12 +98,11 @@ class Pulse(Problem):
         return u
 
 
-class RiemannOblique(Problem):
+class RiemannOblique(Problem2D):
     x_bounds = (0.0, 1.0)
     y_bounds = (0.0, 1.0)
     t_bounds = (0.0, 0.5)
     name = "RiemannOblique"
-    net = PINN(n_inputs=3, n_outputs=1)
     x_orientation = "decrescent"
     y_orientation = "decrescent"
 
@@ -191,12 +125,11 @@ class RiemannOblique(Problem):
         return u
 
 
-class Riemann2D(Problem):
+class Riemann2D(Problem2D):
     x_bounds = (0.0, 1.0)
     y_bounds = (0.0, 1.0)
     t_bounds = (0.0, 1.0 / 12.0)
     name = "Riemann2D"
-    net = PINN(n_inputs=3, n_outputs=1)
 
     @staticmethod
     def f1(u):
@@ -215,12 +148,11 @@ class Riemann2D(Problem):
         return u
 
 
-class BuckleyLeverett(Problem):
+class BuckleyLeverett(Problem2D):
     x_bounds = (-1.5, 1.5)
     y_bounds = (-1.5, 1.5)
     t_bounds = (0.0, 0.5)
     name = "BuckleyLeverett"
-    net = PINN(n_inputs=3, n_outputs=1)
 
     µ_w_µ_0 = 1
     C_g = 5
@@ -244,12 +176,11 @@ class BuckleyLeverett(Problem):
         return u
 
 
-class NonLinearNonConvexFlow(Problem):
+class NonLinearNonConvexFlow(Problem2D):
     x_bounds = (-2.0, 2.0)
     y_bounds = (-2.0, 2.0)
     t_bounds = (0.0, 1.0)
     name = "NonLinearNonConvexFlow"
-    net = PINN(n_inputs=3, n_outputs=1)
 
     @staticmethod
     def f1(u):
