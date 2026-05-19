@@ -79,6 +79,8 @@ class Visualizer:
             record["network_activation"],
             n_inputs=2,
             n_outputs=1,
+            use_characteristic=record.get("use_characteristic", False),
+            characteristic_c=record.get("characteristic_c", 1.0),
         )
         model = self.tracker.load_model(exp_id, net_config)
 
@@ -181,6 +183,8 @@ class Visualizer:
             record["network_activation"],
             n_inputs=3,
             n_outputs=1,
+            use_characteristic=record.get("use_characteristic", False),
+            characteristic_c=record.get("characteristic_c", 1.0),
         )
         model = self.tracker.load_model(exp_id, net_config)
 

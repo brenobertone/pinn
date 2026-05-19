@@ -164,6 +164,8 @@ def train(
     residual_fn = config.get_residual_fn(problem)
 
     loss_history = []
+    loss_f_history = []
+    loss_ic_history = []
     epochs_measured = []
     start_training = time.time()
 
@@ -190,13 +192,17 @@ def train(
                 f"elapsed time = {elapsed:.2f}s"
             )
         loss_history.append(loss.item())
+        loss_f_history.append(loss_f.item())
+        loss_ic_history.append(loss_ic.item())
         epochs_measured.append(epoch)
 
     total_time = time.time() - start_training
     print(f"Total training time: {total_time:.2f} seconds")
 
     fig = plt.figure(figsize=(8, 5))
-    plt.plot(epochs_measured, loss_history, label="Total Loss")
+    plt.plot(epochs_measured, loss_history, label="Total Loss", linewidth=2)
+    plt.plot(epochs_measured, loss_f_history, label="PDE Residual (loss_f)", alpha=0.7)
+    plt.plot(epochs_measured, loss_ic_history, label="Initial Condition (loss_ic)", alpha=0.7)
     plt.yscale("log")
     plt.xlabel("Epoch")
     plt.ylabel("Loss (log scale)")
@@ -212,6 +218,10 @@ def train(
         "final_loss_f": loss_f.item(),
         "final_loss_ic": loss_ic.item(),
         "training_time": total_time,
+        "loss_history": loss_history,
+        "loss_f_history": loss_f_history,
+        "loss_ic_history": loss_ic_history,
+        "epochs_measured": epochs_measured,
     }
 
     return model.to("cpu"), fig, metrics

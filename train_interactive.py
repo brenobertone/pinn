@@ -173,7 +173,20 @@ def main():
         default="relu"
     ).lower()
 
-    print(f"\nArchitecture: {layers} with {activation} activation")
+    # Characteristic transform (only for 1D problems)
+    use_characteristic = False
+    if dim_choice == 1:
+        char_choice = get_input(
+            "\nUse characteristic transform (x - c*t) for advection? (y/n)",
+            default="n"
+        ).lower()
+        use_characteristic = (char_choice == "y")
+
+    if use_characteristic:
+        print(f"\nArchitecture: {layers} with {activation} activation + characteristic transform")
+        print("  (wave speed c will be read from each problem definition)")
+    else:
+        print(f"\nArchitecture: {layers} with {activation} activation")
 
     # Training config
     print("\n" + "=" * 70)
@@ -231,7 +244,10 @@ def main():
     print("Configuration Summary")
     print("=" * 70)
     print(f"Problems: {', '.join(p.name for p in problems)}")
-    print(f"Architecture: {layers} ({activation})")
+    arch_desc = f"{layers} ({activation})"
+    if use_characteristic:
+        arch_desc += " + characteristic"
+    print(f"Architecture: {arch_desc}")
     print(f"Epsilon: {epsilon}")
     print(f"Points: {n_points}")
     print(f"Epochs: {epochs}")
@@ -245,8 +261,7 @@ def main():
         print("Cancelled.")
         return
 
-    # Create config
-    arch = NetworkConfig(layers, activation, n_inputs=n_inputs, n_outputs=1)
+    # Create training config
     config = Config(
         epsilon=epsilon,
         n_points=n_points,
@@ -267,6 +282,22 @@ def main():
     for i, problem in enumerate(problems, 1):
         print(f"\n[{i}/{len(problems)}] Training {problem.name}...")
         print("-" * 70)
+
+        # Get wave speed from problem if using characteristic transform
+        characteristic_c = getattr(problem, 'c', 1.0) if use_characteristic else 1.0
+
+        # Create architecture config for this problem
+        arch = NetworkConfig(
+            layers,
+            activation,
+            n_inputs=n_inputs,
+            n_outputs=1,
+            use_characteristic=use_characteristic,
+            characteristic_c=characteristic_c,
+        )
+
+        if use_characteristic:
+            print(f"Using characteristic transform with c={characteristic_c}")
 
         model = arch.build()
         model, fig, metrics = train(problem, model, config)

@@ -18,6 +18,8 @@ class ExperimentRecord:
     problem_spatial_dims: int
     network_layers: list[int]
     network_activation: str
+    use_characteristic: bool
+    characteristic_c: float
     epsilon: float
     n_points: int
     epochs: int
@@ -46,6 +48,8 @@ class ExperimentTracker:
                 "problem": problem.name,
                 "layers": network_config.layers,
                 "activation": network_config.activation,
+                "use_characteristic": network_config.use_characteristic,
+                "characteristic_c": network_config.characteristic_c,
                 "epsilon": config.epsilon,
                 "n_points": config.n_points,
                 "epochs": config.epochs,
@@ -74,6 +78,8 @@ class ExperimentTracker:
             problem_spatial_dims=problem.spatial_dims,
             network_layers=network_config.layers,
             network_activation=network_config.activation,
+            use_characteristic=network_config.use_characteristic,
+            characteristic_c=network_config.characteristic_c,
             epsilon=config.epsilon,
             n_points=config.n_points,
             epochs=config.epochs,
