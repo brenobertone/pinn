@@ -36,6 +36,8 @@ class Config:
         optimizer: Literal["adam", "adamw", "rmsprop"] = "adamw",
         learning_rate: float = 1e-3,
         sampling_method: Literal["uniform", "latin_hypercube"] = "uniform",
+        snr_compute_interval: int = 100,
+        snr_batches: int = 10,
     ):
         self.epsilon = epsilon
         self.n_points = n_points
@@ -44,6 +46,8 @@ class Config:
         self.optimizer = optimizer
         self.learning_rate = learning_rate
         self.sampling_method = sampling_method
+        self.snr_compute_interval = snr_compute_interval
+        self.snr_batches = snr_batches
 
         if (
             self.sampling_method == "latin_hypercube"
@@ -235,9 +239,49 @@ def train(
     loss_f_history = []
     loss_ic_history = []
     epochs_measured = []
+    
+    snr_history = []
+    snr_epochs = []
+    
     start_training = time.time()
 
     for epoch in range(config.epochs):
+        if config.snr_compute_interval > 0 and epoch % config.snr_compute_interval == 0:
+            batch_grads = []
+            coords_f_chunks = torch.tensor_split(coords_f, config.snr_batches)
+            coords_ic_chunks = torch.tensor_split(coords_ic, config.snr_batches)
+            u0_chunks = torch.tensor_split(u0, config.snr_batches)
+            
+            for b_coords_f, b_coords_ic, b_u0 in zip(coords_f_chunks, coords_ic_chunks, u0_chunks):
+                b_loss = 0.0
+                if b_coords_f.numel() > 0:
+                    f_val = residual_fn(model, b_coords_f)
+                    b_loss = b_loss + torch.mean(f_val**2)
+                if b_coords_ic.numel() > 0:
+                    u_pred_ic = model(b_coords_ic)
+                    b_loss = b_loss + torch.mean((u_pred_ic - b_u0) ** 2)
+                
+                if isinstance(b_loss, torch.Tensor):
+                    optimizer.zero_grad()
+                    b_loss.backward()
+                    
+                    grads = []
+                    for p in model.parameters():
+                        if p.grad is not None:
+                            grads.append(p.grad.view(-1))
+                    if grads:
+                        batch_grads.append(torch.cat(grads))
+            
+            if batch_grads:
+                G = torch.stack(batch_grads)
+                mu = G.mean(dim=0)
+                sigma = G.std(dim=0, unbiased=False)
+                snr = torch.norm(mu, p=2) / (torch.norm(sigma, p=2) + 1e-8)
+                snr_history.append(snr.item())
+                snr_epochs.append(epoch)
+            
+            optimizer.zero_grad()
+
         f = residual_fn(model, coords_f)
         loss_f = torch.mean(f**2)
 
@@ -267,19 +311,36 @@ def train(
     total_time = time.time() - start_training
     print(f"Total training time: {total_time:.2f} seconds")
 
-    fig = plt.figure(figsize=(8, 5))
-    plt.plot(epochs_measured, loss_history, label="Total Loss", linewidth=2)
-    plt.plot(epochs_measured, loss_f_history, label="PDE Residual (loss_f)", alpha=0.7)
-    plt.plot(epochs_measured, loss_ic_history, label="Initial Condition (loss_ic)", alpha=0.7)
-    plt.yscale("log")
-    plt.xlabel("Epoch")
-    plt.ylabel("Loss (log scale)")
-    plt.title(
-        f"{problem.name}'s Training Loss History."
-        + f" Elapsed time: {total_time:.2e} seconds"
+    fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+    
+    axes[0].plot(epochs_measured, loss_history, label="Total Loss", linewidth=2)
+    axes[0].plot(epochs_measured, loss_f_history, label="PDE Residual (loss_f)", alpha=0.7)
+    axes[0].plot(epochs_measured, loss_ic_history, label="Initial Condition (loss_ic)", alpha=0.7)
+    axes[0].set_xscale("log")
+    axes[0].set_yscale("log")
+    axes[0].set_xlabel("Epoch (log scale)")
+    axes[0].set_ylabel("Loss (log scale)")
+    axes[0].set_title(
+        f"{problem.name}'s Training Loss History.\n"
+        + f"Elapsed time: {total_time:.2e} seconds"
     )
-    plt.legend()
-    plt.grid(True)
+    axes[0].legend()
+    axes[0].grid(True)
+
+    if snr_history:
+        axes[1].plot(snr_epochs, snr_history, label="Gradient SNR", color="purple")
+        axes[1].set_xscale("log")
+        axes[1].set_yscale("log")
+        axes[1].set_xlabel("Epoch (log scale)")
+        axes[1].set_ylabel("SNR (log scale)")
+        axes[1].set_title("Gradient Signal-to-Noise Ratio (SNR)")
+        axes[1].legend()
+        axes[1].grid(True)
+    else:
+        axes[1].axis("off")
+        axes[1].set_title("SNR Tracking Disabled or No Data")
+
+    plt.tight_layout()
 
     metrics = {
         "final_loss": loss_history[-1],
@@ -290,6 +351,8 @@ def train(
         "loss_f_history": loss_f_history,
         "loss_ic_history": loss_ic_history,
         "epochs_measured": epochs_measured,
+        "snr_history": snr_history,
+        "snr_epochs": snr_epochs,
     }
 
     return model.to("cpu"), fig, metrics
