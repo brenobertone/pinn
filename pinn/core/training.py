@@ -36,8 +36,8 @@ class Config:
         optimizer: Literal["adam", "adamw", "rmsprop"] = "adamw",
         learning_rate: float = 1e-3,
         sampling_method: Literal["uniform", "latin_hypercube"] = "uniform",
-        snr_compute_interval: int = 100,
-        snr_batches: int = 10,
+        snr_compute_interval: int = 1000,
+        snr_batches: int = 100,
     ):
         self.epsilon = epsilon
         self.n_points = n_points
@@ -303,6 +303,59 @@ def train(
                 f"loss_ic = {loss_ic.item():.5e}, "
                 f"elapsed time = {elapsed:.2f}s"
             )
+
+        if isinstance(problem, Problem1D) and epoch in [config.epochs // 10, 2 * (config.epochs // 3), config.epochs - 1]:
+            import os
+            os.makedirs("results/heatmaps", exist_ok=True)
+            
+            x_min, x_max = problem.x_bounds
+            t_min, t_max = problem.t_bounds
+            
+            n_grid = 200
+            x_line = torch.linspace(x_min, x_max, n_grid, device=device)
+            t_line = torch.linspace(t_min, t_max, n_grid, device=device)
+            X, T = torch.meshgrid(x_line, t_line, indexing="ij")
+            
+            grid_coords = torch.stack([X.flatten(), T.flatten()], dim=-1)
+            grid_coords.requires_grad_(True)
+            
+            f_grid = residual_fn(model, grid_coords)
+            
+            with torch.no_grad():
+                u_grid = model(grid_coords)
+                
+            U = u_grid.reshape(n_grid, n_grid).detach().cpu().numpy()
+            F = f_grid.reshape(n_grid, n_grid).detach().cpu().numpy()
+            
+            # Divide by the maximum absolute residual on collocation points
+            f_colloc_max = torch.max(torch.abs(f)).item()
+            import numpy as np
+            F = np.abs(F) / (f_colloc_max + 1e-8)
+            
+            X_np = X.detach().cpu().numpy()
+            T_np = T.detach().cpu().numpy()
+            
+            X_norm = (X_np - x_min) / (x_max - x_min)
+            T_norm = (T_np - t_min) / (t_max - t_min)
+            
+            fig_hm, axes_hm = plt.subplots(1, 2, figsize=(12, 5))
+            
+            c1 = axes_hm[0].pcolormesh(T_norm, X_norm, U, cmap="viridis", shading="auto")
+            axes_hm[0].set_title(f"Solution at Epoch {epoch}")
+            axes_hm[0].set_xlabel("Normalized t")
+            axes_hm[0].set_ylabel("Normalized x")
+            fig_hm.colorbar(c1, ax=axes_hm[0])
+            
+            c2 = axes_hm[1].pcolormesh(T_norm, X_norm, F, cmap="viridis", shading="auto", vmin=0, vmax=1)
+            axes_hm[1].set_title(f"Residual at Epoch {epoch}")
+            axes_hm[1].set_xlabel("Normalized t")
+            axes_hm[1].set_ylabel("Normalized x")
+            fig_hm.colorbar(c2, ax=axes_hm[1])
+            
+            fig_hm.tight_layout()
+            fig_hm.savefig(f"results/heatmaps/{problem.name}_epoch_{epoch}.png")
+            plt.close(fig_hm)
+
         loss_history.append(loss.item())
         loss_f_history.append(loss_f.item())
         loss_ic_history.append(loss_ic.item())
