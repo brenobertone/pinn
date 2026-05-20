@@ -228,6 +228,17 @@ def main():
         methods = ["autograd", "mm2", "mm3", "uno"]
         residual_method = methods[method_choice - 1] if 1 <= method_choice <= 4 else "autograd"
 
+    # Sampling method
+    if residual_method == "autograd":
+        print("\nSampling strategy:")
+        print("  1. uniform (standard mesh)")
+        print("  2. latin_hypercube (LHS)")
+        sampling_choice = get_input("Select", default="1", type_fn=int)
+        sampling_method = "uniform" if sampling_choice == 1 else "latin_hypercube"
+    else:
+        print("\nNote: Latin Hypercube Sampling is only available with 'autograd'. Using 'uniform'.")
+        sampling_method = "uniform"
+
     optimizer = get_input(
         "Optimizer (adam/adamw/rmsprop)",
         default="adamw"
@@ -250,6 +261,7 @@ def main():
     print(f"Architecture: {arch_desc}")
     print(f"Epsilon: {epsilon}")
     print(f"Points: {n_points}")
+    print(f"Sampling: {sampling_method}")
     print(f"Epochs: {epochs}")
     print(f"Residual: {residual_method}")
     print(f"Optimizer: {optimizer}")
@@ -269,6 +281,7 @@ def main():
         residual_method=residual_method,
         optimizer=optimizer,
         learning_rate=learning_rate,
+        sampling_method=sampling_method,
     )
 
     tracker = ExperimentTracker()

@@ -35,6 +35,7 @@ class Config:
         residual_method: Literal["autograd", "mm2", "mm3", "uno"] = "autograd",
         optimizer: Literal["adam", "adamw", "rmsprop"] = "adamw",
         learning_rate: float = 1e-3,
+        sampling_method: Literal["uniform", "latin_hypercube"] = "uniform",
     ):
         self.epsilon = epsilon
         self.n_points = n_points
@@ -42,6 +43,15 @@ class Config:
         self.residual_method = residual_method
         self.optimizer = optimizer
         self.learning_rate = learning_rate
+        self.sampling_method = sampling_method
+
+        if (
+            self.sampling_method == "latin_hypercube"
+            and self.residual_method != "autograd"
+        ):
+            raise ValueError(
+                "Latin Hypercube Sampling is only supported with the 'autograd' residual method."
+            )
 
     def get_residual_fn(self, problem: Problem) -> Callable:
         if isinstance(problem, Problem1D):
@@ -68,8 +78,36 @@ class Config:
         return lambda model, xyt: fn(model, problem, xyt, self.epsilon)
 
 
+def lhs_samples(
+    n_samples: int,
+    d_dimensions: int,
+    bounds: list[tuple[float, float]],
+    device,
+) -> torch.Tensor:
+    """Native PyTorch implementation of Latin Hypercube Sampling."""
+    # Create the intervals
+    probs = torch.rand(n_samples, d_dimensions, device=device)
+    # Generate a random permutation for each dimension
+    perms = torch.stack(
+        [torch.randperm(n_samples, device=device) for _ in range(d_dimensions)],
+        dim=1,
+    )
+    # Combine to get LHS in [0, 1]^d
+    samples = (perms.float() + probs) / n_samples
+
+    # Scale to bounds
+    for d in range(d_dimensions):
+        min_val, max_val = bounds[d]
+        samples[:, d] = samples[:, d] * (max_val - min_val) + min_val
+
+    return samples
+
+
 def uniform_mesh_1d(
-    n_points: int, x_bounds: tuple[float, float], t_bounds: tuple[float, float], device
+    n_points: int,
+    x_bounds: tuple[float, float],
+    t_bounds: tuple[float, float],
+    device,
 ) -> torch.Tensor:
     Nx = Nt = round(n_points ** (1 / 2))
     x_min, x_max = x_bounds
@@ -121,43 +159,73 @@ def train(
     )
 
     if isinstance(problem, Problem1D):
-        coords_f = uniform_mesh_1d(
-            config.n_points,
-            problem.x_bounds,
-            problem.t_bounds,
-            device,
-        )
-        Nx = Nt = round(config.n_points ** (1 / 2))
-        x_mask = slice(PADDING, PADDING + Nx)
-        t_mask = slice(PADDING, PADDING + Nt)
-        coords_inner = coords_f[x_mask, t_mask, :].reshape(-1, 2)
+        if config.sampling_method == "uniform":
+            coords_f = uniform_mesh_1d(
+                config.n_points,
+                problem.x_bounds,
+                problem.t_bounds,
+                device,
+            )
+            Nx = Nt = round(config.n_points ** (1 / 2))
+            x_mask = slice(PADDING, PADDING + Nx)
+            t_mask = slice(PADDING, PADDING + Nt)
+            coords_inner = coords_f[x_mask, t_mask, :].reshape(-1, 2)
 
-        x_ic = coords_inner[:, 0:1]
-        t_ic = torch.zeros_like(x_ic, device=device)
-        coords_ic = torch.cat([x_ic, t_ic], dim=1)
-        u0 = problem.initial_condition(x_ic)
+            x_ic = coords_inner[:, 0:1]
+            t_ic = torch.zeros_like(x_ic, device=device)
+            coords_ic = torch.cat([x_ic, t_ic], dim=1)
+            u0 = problem.initial_condition(x_ic)
+        else:
+            coords_f = lhs_samples(
+                config.n_points,
+                2,
+                [problem.x_bounds, problem.t_bounds],
+                device,
+            )
+            n_ic = round(config.n_points ** (1 / 2))
+            x_ic = lhs_samples(n_ic, 1, [problem.x_bounds], device)
+            t_ic = torch.zeros_like(x_ic, device=device)
+            coords_ic = torch.cat([x_ic, t_ic], dim=1)
+            u0 = problem.initial_condition(x_ic)
 
     elif isinstance(problem, Problem2D):
-        coords_f = uniform_mesh_2d(
-            config.n_points,
-            [
-                problem.x_bounds,
-                problem.y_bounds,
-                problem.t_bounds,
-            ],
-            device,
-        )
-        Nx = Ny = Nt = round(config.n_points ** (1 / 3))
-        x_mask = slice(PADDING, PADDING + Nx)
-        y_mask = slice(PADDING, PADDING + Ny)
-        t_mask = slice(PADDING, PADDING + Nt)
-        coords_inner = coords_f[x_mask, y_mask, t_mask, :].reshape(-1, 3)
+        if config.sampling_method == "uniform":
+            coords_f = uniform_mesh_2d(
+                config.n_points,
+                [
+                    problem.x_bounds,
+                    problem.y_bounds,
+                    problem.t_bounds,
+                ],
+                device,
+            )
+            Nx = Ny = Nt = round(config.n_points ** (1 / 3))
+            x_mask = slice(PADDING, PADDING + Nx)
+            y_mask = slice(PADDING, PADDING + Ny)
+            t_mask = slice(PADDING, PADDING + Nt)
+            coords_inner = coords_f[x_mask, y_mask, t_mask, :].reshape(-1, 3)
 
-        x_ic = coords_inner[:, 0:1]
-        y_ic = coords_inner[:, 1:2]
-        t_ic = torch.zeros_like(x_ic, device=device)
-        coords_ic = torch.cat([x_ic, y_ic, t_ic], dim=1)
-        u0 = problem.initial_condition(x_ic, y_ic)
+            x_ic = coords_inner[:, 0:1]
+            y_ic = coords_inner[:, 1:2]
+            t_ic = torch.zeros_like(x_ic, device=device)
+            coords_ic = torch.cat([x_ic, y_ic, t_ic], dim=1)
+            u0 = problem.initial_condition(x_ic, y_ic)
+        else:
+            coords_f = lhs_samples(
+                config.n_points,
+                3,
+                [problem.x_bounds, problem.y_bounds, problem.t_bounds],
+                device,
+            )
+            n_ic = round(config.n_points ** (2 / 3))
+            spatial_lhs = lhs_samples(
+                n_ic, 2, [problem.x_bounds, problem.y_bounds], device
+            )
+            x_ic = spatial_lhs[:, 0:1]
+            y_ic = spatial_lhs[:, 1:2]
+            t_ic = torch.zeros_like(x_ic, device=device)
+            coords_ic = torch.cat([x_ic, y_ic, t_ic], dim=1)
+            u0 = problem.initial_condition(x_ic, y_ic)
     else:
         raise ValueError(f"Unknown problem type: {type(problem)}")
 

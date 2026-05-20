@@ -109,17 +109,24 @@ def main():
     print("  2. 2D problems")
     dim_choice = get_input("Select", default="1", type_fn=int)
 
+    # Animation settings
+    print("\n" + "=" * 70)
+    print("Animation Settings")
+    print("=" * 70)
+    num_frames = get_input("Number of frames", default=100, type_fn=int)
+    fps = get_input("Frames per second (FPS)", default=15, type_fn=int)
+
     if dim_choice == 1:
         df_selected = df_1d
         problem_map = problem_map_1d
         animate_fn = lambda viz, exp_id, prob: viz.animate_solution_1d(
-            exp_id, prob, steps=get_input("Number of frames", default=100, type_fn=int)
+            exp_id, prob, steps=num_frames, fps=fps
         )
     else:
         df_selected = df_2d
         problem_map = problem_map_2d
         animate_fn = lambda viz, exp_id, prob: viz.animate_solution_2d(
-            exp_id, prob, steps=get_input("Number of frames", default=100, type_fn=int)
+            exp_id, prob, steps=num_frames, fps=fps
         )
 
     if df_selected.empty:

@@ -24,6 +24,7 @@ class ExperimentRecord:
     n_points: int
     epochs: int
     residual_method: str
+    sampling_method: str
     optimizer: str
     learning_rate: float
     final_loss: float
@@ -54,6 +55,7 @@ class ExperimentTracker:
                 "n_points": config.n_points,
                 "epochs": config.epochs,
                 "residual": config.residual_method,
+                "sampling": config.sampling_method,
                 "optimizer": config.optimizer,
                 "lr": config.learning_rate,
             },
@@ -84,6 +86,7 @@ class ExperimentTracker:
             n_points=config.n_points,
             epochs=config.epochs,
             residual_method=config.residual_method,
+            sampling_method=config.sampling_method,
             optimizer=config.optimizer,
             learning_rate=config.learning_rate,
             final_loss=metrics["final_loss"],

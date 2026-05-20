@@ -57,12 +57,22 @@ if __name__ == "__main__":
     n_points_1d = [10000]
     epochs = [5000]
     residuals = ["autograd", "mm2", "mm3", "uno"]
+    sampling_methods = ["uniform", "latin_hypercube"]
     optimizers = ["adamw"]
 
     for problem_cls in problems_2d:
-        for arch, e, n, ep, r, opt in product(
-            architectures, epsilons, n_points_2d, epochs, residuals, optimizers
+        for arch, e, n, ep, r, s, opt in product(
+            architectures,
+            epsilons,
+            n_points_2d,
+            epochs,
+            residuals,
+            sampling_methods,
+            optimizers,
         ):
+            if s == "latin_hypercube" and r != "autograd":
+                continue
+
             problem = problem_cls()
             model = NetworkConfig(
                 arch.layers, arch.activation, n_inputs=3, n_outputs=1
@@ -72,6 +82,7 @@ if __name__ == "__main__":
                 n_points=n,
                 epochs=ep,
                 residual_method=r,
+                sampling_method=s,
                 optimizer=opt,
             )
 
@@ -79,14 +90,18 @@ if __name__ == "__main__":
             tracker.log_run(problem, config, arch, model, metrics, fig)
 
     for problem_cls in problems_1d:
-        for arch, e, n, ep, r, opt in product(
+        for arch, e, n, ep, r, s, opt in product(
             architectures,
             epsilons,
             n_points_1d,
             epochs,
             ["autograd", "mm2"],
+            sampling_methods,
             optimizers,
         ):
+            if s == "latin_hypercube" and r != "autograd":
+                continue
+
             problem = problem_cls()
             model = NetworkConfig(
                 arch.layers, arch.activation, n_inputs=2, n_outputs=1
@@ -96,6 +111,7 @@ if __name__ == "__main__":
                 n_points=n,
                 epochs=ep,
                 residual_method=r,
+                sampling_method=s,
                 optimizer=opt,
             )
 

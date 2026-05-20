@@ -67,7 +67,7 @@ class Visualizer:
         return df_filtered[columns].sort_values("final_loss")
 
     def animate_solution_1d(
-        self, exp_id: str, problem: Problem1D, steps: int = 200
+        self, exp_id: str, problem: Problem1D, steps: int = 200, fps: int = 15
     ) -> None:
         df = self.tracker.load_experiments()
         record = df[df["exp_id"] == exp_id].iloc[0]
@@ -84,7 +84,7 @@ class Visualizer:
         )
         model = self.tracker.load_model(exp_id, net_config)
 
-        x_plot = np.linspace(problem.x_bounds[0], problem.x_bounds[1], 200)
+        x_plot = np.linspace(problem.x_bounds[0], problem.x_bounds[1], 1000)
         t_vals = np.linspace(problem.t_bounds[0], problem.t_bounds[1], steps)
 
         # Compute PINN solution
@@ -165,13 +165,13 @@ class Visualizer:
         save_path.mkdir(exist_ok=True, parents=True)
         anim.save(
             save_path / f"animate_1d_{exp_id}.mp4",
-            writer=FFMpegWriter(fps=15),
+            writer=FFMpegWriter(fps=fps),
         )
         plt.close(fig)
         print(f"Saved animation to {save_path / f'animate_1d_{exp_id}.mp4'}")
 
     def animate_solution_2d(
-        self, exp_id: str, problem: Problem2D, steps: int = 200
+        self, exp_id: str, problem: Problem2D, steps: int = 200, fps: int = 15
     ) -> None:
         df = self.tracker.load_experiments()
         record = df[df["exp_id"] == exp_id].iloc[0]
@@ -262,7 +262,7 @@ class Visualizer:
         save_path.mkdir(exist_ok=True, parents=True)
         anim.save(
             save_path / f"animate_2d_{exp_id}.mp4",
-            writer=FFMpegWriter(fps=15),
+            writer=FFMpegWriter(fps=fps),
         )
         plt.close(fig)
         print(f"Saved animation to {save_path / f'animate_2d_{exp_id}.mp4'}")
