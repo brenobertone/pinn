@@ -27,6 +27,8 @@ class ExperimentRecord:
     sampling_method: str
     optimizer: str
     learning_rate: float
+    rba_enabled: bool
+    rba_eta: float
     final_loss: float
     final_loss_f: float
     final_loss_ic: float
@@ -39,7 +41,7 @@ class ExperimentTracker:
         self.results_dir.mkdir(exist_ok=True)
         self.db_path = self.results_dir / "experiments.jsonl"
 
-    def _generate_id(
+    def generate_id(
         self, problem: Problem, config: Config, network_config: NetworkConfig
     ) -> str:
         import hashlib
@@ -58,6 +60,8 @@ class ExperimentTracker:
                 "sampling": config.sampling_method,
                 "optimizer": config.optimizer,
                 "lr": config.learning_rate,
+                "rba_enabled": config.rba_enabled,
+                "rba_eta": config.rba_eta,
             },
             sort_keys=True,
         )
@@ -72,7 +76,7 @@ class ExperimentTracker:
         metrics: dict[str, Any],
         figure=None,
     ) -> str:
-        exp_id = self._generate_id(problem, config, network_config)
+        exp_id = self.generate_id(problem, config, network_config)
 
         record = ExperimentRecord(
             exp_id=exp_id,
@@ -89,6 +93,8 @@ class ExperimentTracker:
             sampling_method=config.sampling_method,
             optimizer=config.optimizer,
             learning_rate=config.learning_rate,
+            rba_enabled=config.rba_enabled,
+            rba_eta=config.rba_eta,
             final_loss=metrics["final_loss"],
             final_loss_f=metrics["final_loss_f"],
             final_loss_ic=metrics["final_loss_ic"],

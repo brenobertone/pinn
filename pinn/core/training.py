@@ -36,8 +36,10 @@ class Config:
         optimizer: Literal["adam", "adamw", "rmsprop"] = "adamw",
         learning_rate: float = 1e-3,
         sampling_method: Literal["uniform", "latin_hypercube"] = "uniform",
-        snr_compute_interval: int = 1000,
+        snr_compute_interval: int = 250,
         snr_batches: int = 100,
+        rba_enabled: bool = False,
+        rba_eta: float = 0.1,
     ):
         self.epsilon = epsilon
         self.n_points = n_points
@@ -48,6 +50,8 @@ class Config:
         self.sampling_method = sampling_method
         self.snr_compute_interval = snr_compute_interval
         self.snr_batches = snr_batches
+        self.rba_enabled = rba_enabled
+        self.rba_eta = rba_eta
 
         if (
             self.sampling_method == "latin_hypercube"
@@ -147,11 +151,16 @@ def uniform_mesh_2d(
 
 
 def train(
-    problem: Problem, model: nn.Module, config: Config
+    problem: Problem, model: nn.Module, config: Config, exp_id: str = None
 ) -> tuple[nn.Module, Figure, dict]:
     print(f"Training {problem.name}...")
 
     model.to(device)
+    # try:
+    #     model = torch.compile(model)
+    #     print("Model compiled successfully using torch.compile")
+    # except Exception as e:
+    #     print(f"Warning: torch.compile failed ({e}). Proceeding without compilation.")
 
     optimizer_map = {
         "adam": torch.optim.Adam,
@@ -242,6 +251,12 @@ def train(
     
     snr_history = []
     snr_epochs = []
+
+    if config.rba_enabled:
+        # Use flattened coords_f to determine the number of weights
+        n_colloc = coords_f.view(-1, coords_f.shape[-1]).shape[0]
+        lambda_weights = torch.ones(n_colloc, device=device)
+        gamma = 1.0 - config.rba_eta
     
     start_training = time.time()
 
@@ -262,13 +277,15 @@ def train(
                     b_loss = b_loss + torch.mean((u_pred_ic - b_u0) ** 2)
                 
                 if isinstance(b_loss, torch.Tensor):
-                    optimizer.zero_grad()
+                    optimizer.zero_grad(set_to_none=True)
                     b_loss.backward()
                     
                     grads = []
                     for p in model.parameters():
                         if p.grad is not None:
                             grads.append(p.grad.view(-1))
+                        else:
+                            grads.append(torch.zeros_like(p).view(-1))
                     if grads:
                         batch_grads.append(torch.cat(grads))
             
@@ -280,17 +297,26 @@ def train(
                 snr_history.append(snr.item())
                 snr_epochs.append(epoch)
             
-            optimizer.zero_grad()
+            optimizer.zero_grad(set_to_none=True)
 
         f = residual_fn(model, coords_f)
-        loss_f = torch.mean(f**2)
+        if config.rba_enabled:
+            with torch.no_grad():
+                abs_f = torch.abs(f).view(-1)
+                max_abs_f = torch.max(abs_f)
+                lambda_weights = gamma * lambda_weights + config.rba_eta * (
+                    abs_f / (max_abs_f + 1e-8)
+                )
+            loss_f = torch.mean((lambda_weights.view_as(f) * f) ** 2)
+        else:
+            loss_f = torch.mean(f**2)
 
         u_pred_ic = model(coords_ic)
         loss_ic = torch.mean((u_pred_ic - u0) ** 2)
 
         loss = loss_f + loss_ic
 
-        optimizer.zero_grad()
+        optimizer.zero_grad(set_to_none=True)
         loss.backward()
         optimizer.step()
 
@@ -353,15 +379,23 @@ def train(
             fig_hm.colorbar(c2, ax=axes_hm[1])
             
             fig_hm.tight_layout()
-            fig_hm.savefig(f"results/heatmaps/{problem.name}_epoch_{epoch}.png")
+            
+            exp_suffix = f"_{exp_id}" if exp_id else ""
+            fig_hm.savefig(f"results/heatmaps/{problem.name}{exp_suffix}_epoch_{epoch}.png")
             plt.close(fig_hm)
 
-        loss_history.append(loss.item())
-        loss_f_history.append(loss_f.item())
-        loss_ic_history.append(loss_ic.item())
+        loss_history.append(loss.detach())
+        loss_f_history.append(loss_f.detach())
+        loss_ic_history.append(loss_ic.detach())
         epochs_measured.append(epoch)
 
     total_time = time.time() - start_training
+    
+    # Convert history tensors to CPU numbers at the end
+    loss_history = [l.item() for l in loss_history]
+    loss_f_history = [l.item() for l in loss_f_history]
+    loss_ic_history = [l.item() for l in loss_ic_history]
+
     print(f"Total training time: {total_time:.2f} seconds")
 
     fig, axes = plt.subplots(1, 2, figsize=(14, 5))

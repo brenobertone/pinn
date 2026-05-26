@@ -86,7 +86,8 @@ if __name__ == "__main__":
                 optimizer=opt,
             )
 
-            model, fig, metrics = train(problem, model, config)
+            exp_id = tracker.generate_id(problem, config, arch)
+            model, fig, metrics = train(problem, model, config, exp_id=exp_id)
             tracker.log_run(problem, config, arch, model, metrics, fig)
 
     for problem_cls in problems_1d:
@@ -115,7 +116,8 @@ if __name__ == "__main__":
                 optimizer=opt,
             )
 
-            model, fig, metrics = train(problem, model, config)
+            exp_id = tracker.generate_id(problem, config, arch)
+            model, fig, metrics = train(problem, model, config, exp_id=exp_id)
             tracker.log_run(problem, config, arch, model, metrics, fig)
 
     print("\n=== Training Complete ===")

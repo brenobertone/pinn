@@ -86,7 +86,7 @@ def main():
     print("\n1D or 2D problems?")
     print("  1. 1D problems")
     print("  2. 2D problems")
-    dim_choice = get_input("Select", default="1", type_fn=int)
+    dim_choice = get_input("Select", default=1, type_fn=int)
 
     # Select problems
     if dim_choice == 1:
@@ -105,7 +105,7 @@ def main():
         )
         problems = [problems_1d[i][1]() for i in selected]
         n_inputs = 2
-        default_points = 10000
+        default_points = 5000
         points_desc = "points (sqrt gives grid resolution)"
     else:
         problems_2d = [
@@ -142,18 +142,18 @@ def main():
 
     arch_preset = get_input(
         "\nUse preset architecture?\n"
-        "  1. Small (3 layers × 20 neurons)\n"
+        "  1. Small (3 layers × 32 neurons)\n"
         "  2. Default (5 layers × 20 neurons)\n"
         "  3. Wide (3 layers × 50 neurons)\n"
         "  4. Deep (10 layers × 20 neurons)\n"
         "  5. Custom\n"
         "Select",
-        default="2",
+        default="1",
         type_fn=int
     )
 
     presets = {
-        1: [20, 20, 20],
+        1: [32, 32, 32],
         2: [20, 20, 20, 20, 20],
         3: [50, 50, 50],
         4: [20] * 10,
@@ -164,13 +164,13 @@ def main():
     else:
         layers_input = get_input(
             "Enter layer sizes (comma-separated)",
-            default="20,20,20,20,20"
+            default="32,32,32"
         )
         layers = [int(x.strip()) for x in layers_input.split(",")]
 
     activation = get_input(
         "Activation function (relu/tanh/sigmoid)",
-        default="relu"
+        default="tanh"
     ).lower()
 
     # Characteristic transform (only for 1D problems)
@@ -195,7 +195,7 @@ def main():
 
     epsilon = get_input(
         f"\nViscosity coefficient epsilon",
-        default=0.0025,
+        default=0,
         type_fn=float
     )
 
@@ -207,24 +207,24 @@ def main():
 
     epochs = get_input(
         "Number of epochs",
-        default=5000,
+        default=50000,
         type_fn=int
     )
 
     # Residual method
-    if dim_choice == 1:
+    if dim_choice == 1 or dim_choice == "1":
         print("\nResidual computation method:")
         print("  1. autograd (pure autodiff)")
         print("  2. mm2 (MinMod2 slope limiter)")
-        method_choice = get_input("Select", default="1", type_fn=int)
-        residual_method = "autograd" if method_choice == 1 else "mm2"
+        method_choice = get_input("Select", default="1", type_fn=str)
+        residual_method = "autograd" if method_choice == "1" else "mm2"
     else:
         print("\nResidual computation method:")
         print("  1. autograd (pure autodiff)")
         print("  2. mm2 (MinMod2 slope limiter)")
         print("  3. mm3 (MinMod3 slope limiter)")
         print("  4. uno (UNO scheme)")
-        method_choice = get_input("Select", default="1", type_fn=int)
+        method_choice = int(get_input("Select", default="1", type_fn=str))
         methods = ["autograd", "mm2", "mm3", "uno"]
         residual_method = methods[method_choice - 1] if 1 <= method_choice <= 4 else "autograd"
 
@@ -233,7 +233,7 @@ def main():
         print("\nSampling strategy:")
         print("  1. uniform (standard mesh)")
         print("  2. latin_hypercube (LHS)")
-        sampling_choice = get_input("Select", default="1", type_fn=int)
+        sampling_choice = get_input("Select", default="2", type_fn=int)
         sampling_method = "uniform" if sampling_choice == 1 else "latin_hypercube"
     else:
         print("\nNote: Latin Hypercube Sampling is only available with 'autograd'. Using 'uniform'.")
@@ -241,7 +241,7 @@ def main():
 
     optimizer = get_input(
         "Optimizer (adam/adamw/rmsprop)",
-        default="adamw"
+        default="adam"
     ).lower()
 
     learning_rate = get_input(
@@ -249,6 +249,20 @@ def main():
         default=1e-3,
         type_fn=float
     )
+
+    rba_enabled_choice = get_input(
+        "Enable Residual-Based Attention (RBA)? (y/n)",
+        default="n"
+    ).lower()
+    rba_enabled = (rba_enabled_choice == "y")
+
+    rba_eta = 0.001
+    if rba_enabled:
+        rba_eta = get_input(
+            "RBA update rate (eta)",
+            default=0.001,
+            type_fn=float
+        )
 
     # Summary
     print("\n" + "=" * 70)
@@ -266,6 +280,9 @@ def main():
     print(f"Residual: {residual_method}")
     print(f"Optimizer: {optimizer}")
     print(f"Learning rate: {learning_rate}")
+    print(f"RBA Enabled: {rba_enabled}")
+    if rba_enabled:
+        print(f"RBA Eta: {rba_eta}")
     print("=" * 70)
 
     proceed = get_input("\nProceed with training? (y/n)", default="y").lower()
@@ -282,6 +299,8 @@ def main():
         optimizer=optimizer,
         learning_rate=learning_rate,
         sampling_method=sampling_method,
+        rba_enabled=rba_enabled,
+        rba_eta=rba_eta,
     )
 
     tracker = ExperimentTracker()
@@ -313,8 +332,12 @@ def main():
             print(f"Using characteristic transform with c={characteristic_c}")
 
         model = arch.build()
-        model, fig, metrics = train(problem, model, config)
-        exp_id = tracker.log_run(problem, config, arch, model, metrics, fig)
+        
+        # Pre-generate ID to use for intermediate artifacts like heatmaps
+        exp_id = tracker.generate_id(problem, config, arch)
+        
+        model, fig, metrics = train(problem, model, config, exp_id=exp_id)
+        tracker.log_run(problem, config, arch, model, metrics, fig)
 
         results.append({
             "problem": problem.name,
