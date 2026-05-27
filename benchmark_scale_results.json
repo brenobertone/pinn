@@ -1,0 +1,98 @@
+[
+    {
+        "scenario": "1D_autograd_LHS",
+        "status": "Success",
+        "error": null,
+        "duration": 6.32790994644165,
+        "pts": 10000,
+        "snr_batches": 1000
+    },
+    {
+        "scenario": "1D_autograd_Uniform",
+        "status": "Success",
+        "error": null,
+        "duration": 2.4946467876434326,
+        "pts": 10000,
+        "snr_batches": 1000
+    },
+    {
+        "scenario": "1D_mm2_Uniform",
+        "status": "Failed",
+        "error": "index 1 is out of bounds for dimension 0 with size 1",
+        "duration": 0,
+        "pts": 10000,
+        "snr_batches": 1000
+    },
+    {
+        "scenario": "2D_autograd_LHS",
+        "status": "Success",
+        "error": null,
+        "duration": 8.870716333389282,
+        "pts": 50000,
+        "snr_batches": 1000
+    },
+    {
+        "scenario": "2D_autograd_Uniform",
+        "status": "Success",
+        "error": null,
+        "duration": 3.5532619953155518,
+        "pts": 50000,
+        "snr_batches": 1000
+    },
+    {
+        "scenario": "2D_mm2_Uniform",
+        "status": "Failed",
+        "error": "index 1 is out of bounds for dimension 0 with size 1",
+        "duration": 0,
+        "pts": 50000,
+        "snr_batches": 1000
+    },
+    {
+        "scenario": "2D_mm3_Uniform",
+        "status": "Failed",
+        "error": "index 1 is out of bounds for dimension 0 with size 1",
+        "duration": 0,
+        "pts": 50000,
+        "snr_batches": 1000
+    },
+    {
+        "scenario": "2D_uno_Uniform",
+        "status": "Failed",
+        "error": "index 1 is out of bounds for dimension 0 with size 1",
+        "duration": 0,
+        "pts": 50000,
+        "snr_batches": 1000
+    },
+    {
+        "scenario": "Scale_10000_pts",
+        "status": "Success",
+        "error": null,
+        "duration": 7.128755569458008,
+        "pts": 10000,
+        "snr_batches": 1000
+    },
+    {
+        "scenario": "Scale_50000_pts",
+        "status": "Success",
+        "error": null,
+        "duration": 8.693697452545166,
+        "pts": 50000,
+        "snr_batches": 1000
+    },
+    {
+        "scenario": "Scale_100000_pts",
+        "status": "Success",
+        "error": null,
+        "duration": 12.47565484046936,
+        "pts": 100000,
+        "snr_batches": 1000
+    },
+    {
+        "scenario": "Scale_250000_pts",
+        "status": "Success",
+        "error": null,
+        "duration": 14.817327976226807,
+        "pts": 250000,
+        "snr_batches": 1000
+    }
+]
