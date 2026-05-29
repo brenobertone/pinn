@@ -4,6 +4,7 @@ Interactive PINN training script.
 Prompts for all configuration options with defaults.
 """
 
+import itertools
 import sys
 
 from pinn.core.architectures import NetworkConfig
@@ -44,6 +45,28 @@ def get_input(prompt, default=None, type_fn=str):
     except ValueError:
         print(f"Invalid input. Using default: {default}")
         return default
+
+
+def get_input_list(prompt, default=None, type_fn=str):
+    """Get user input as a list of values."""
+    if default is not None:
+        if isinstance(default, list):
+            default_str = ",".join(map(str, default))
+        else:
+            default_str = str(default)
+        full_prompt = f"{prompt} [{default_str}]: "
+    else:
+        full_prompt = f"{prompt}: "
+
+    value = input(full_prompt).strip()
+    if not value and default is not None:
+        return default if isinstance(default, list) else [default]
+
+    try:
+        return [type_fn(x.strip()) for x in value.split(",")]
+    except ValueError:
+        print(f"Invalid input. Using default: {default}")
+        return default if isinstance(default, list) else [default]
 
 
 def get_multi_choice(prompt, options, default_indices=None):
@@ -193,59 +216,56 @@ def main():
     print("Training Configuration")
     print("=" * 70)
 
-    epsilon = get_input(
-        f"\nViscosity coefficient epsilon",
-        default=0,
+    epsilons = get_input_list(
+        f"\nViscosity coefficients epsilon (comma-separated)",
+        default=0.0,
         type_fn=float
     )
 
-    n_points = get_input(
-        f"Number of {points_desc}",
+    points_list = get_input_list(
+        f"Number of {points_desc} (comma-separated)",
         default=default_points,
         type_fn=int
     )
 
-    epochs = get_input(
-        "Number of epochs",
+    epochs_list = get_input_list(
+        "Number of epochs (comma-separated)",
         default=50000,
         type_fn=int
     )
 
-    # Residual method
-    if dim_choice == 1 or dim_choice == "1":
-        print("\nResidual computation method:")
-        print("  1. autograd (pure autodiff)")
-        print("  2. mm2 (MinMod2 slope limiter)")
-        method_choice = get_input("Select", default="1", type_fn=str)
-        residual_method = "autograd" if method_choice == "1" else "mm2"
+    # Residual methods selection
+    if dim_choice == 1:
+        methods_options = ["autograd", "mm2"]
     else:
-        print("\nResidual computation method:")
-        print("  1. autograd (pure autodiff)")
-        print("  2. mm2 (MinMod2 slope limiter)")
-        print("  3. mm3 (MinMod3 slope limiter)")
-        print("  4. uno (UNO scheme)")
-        method_choice = int(get_input("Select", default="1", type_fn=str))
-        methods = ["autograd", "mm2", "mm3", "uno"]
-        residual_method = methods[method_choice - 1] if 1 <= method_choice <= 4 else "autograd"
+        methods_options = ["autograd", "mm2", "mm3", "uno"]
+
+    selected_methods_indices = get_multi_choice(
+        "Select residual computation methods:",
+        methods_options,
+        default_indices=[0]
+    )
+    residual_methods = [methods_options[i] for i in selected_methods_indices]
 
     # Sampling method
-    if residual_method == "autograd":
-        print("\nSampling strategy:")
+    if "autograd" in residual_methods:
+        print("\nSampling strategy (only applies to 'autograd' method):")
         print("  1. uniform (standard mesh)")
         print("  2. latin_hypercube (LHS)")
         sampling_choice = get_input("Select", default="2", type_fn=int)
         sampling_method = "uniform" if sampling_choice == 1 else "latin_hypercube"
     else:
-        print("\nNote: Latin Hypercube Sampling is only available with 'autograd'. Using 'uniform'.")
         sampling_method = "uniform"
 
-    optimizer = get_input(
-        "Optimizer (adam/adamw/rmsprop)",
-        default="adam"
-    ).lower()
+    optimizers = get_input_list(
+        "Optimizers (adam/adamw/rmsprop, comma-separated)",
+        default="adam",
+        type_fn=str
+    )
+    optimizers = [opt.lower() for opt in optimizers]
 
-    learning_rate = get_input(
-        "Learning rate",
+    learning_rates = get_input_list(
+        "Learning rates (comma-separated)",
         default=1e-3,
         type_fn=float
     )
@@ -264,22 +284,35 @@ def main():
             type_fn=float
         )
 
+    # Generate Cartesian product of all parameters
+    combinations = list(itertools.product(
+        epsilons,
+        points_list,
+        epochs_list,
+        residual_methods,
+        optimizers,
+        learning_rates
+    ))
+
     # Summary
     print("\n" + "=" * 70)
     print("Configuration Summary")
     print("=" * 70)
     print(f"Problems: {', '.join(p.name for p in problems)}")
+    print(f"Total Combinations per Problem: {len(combinations)}")
+    print(f"Total Experiments: {len(problems) * len(combinations)}")
+    print("-" * 70)
+    print(f"Epsilons: {epsilons}")
+    print(f"Points: {points_list}")
+    print(f"Epochs: {epochs_list}")
+    print(f"Residual Methods: {residual_methods}")
+    print(f"Optimizers: {optimizers}")
+    print(f"Learning Rates: {learning_rates}")
     arch_desc = f"{layers} ({activation})"
     if use_characteristic:
         arch_desc += " + characteristic"
     print(f"Architecture: {arch_desc}")
-    print(f"Epsilon: {epsilon}")
-    print(f"Points: {n_points}")
-    print(f"Sampling: {sampling_method}")
-    print(f"Epochs: {epochs}")
-    print(f"Residual: {residual_method}")
-    print(f"Optimizer: {optimizer}")
-    print(f"Learning rate: {learning_rate}")
+    print(f"Sampling: {sampling_method} (if autograd)")
     print(f"RBA Enabled: {rba_enabled}")
     if rba_enabled:
         print(f"RBA Eta: {rba_eta}")
@@ -290,19 +323,6 @@ def main():
         print("Cancelled.")
         return
 
-    # Create training config
-    config = Config(
-        epsilon=epsilon,
-        n_points=n_points,
-        epochs=epochs,
-        residual_method=residual_method,
-        optimizer=optimizer,
-        learning_rate=learning_rate,
-        sampling_method=sampling_method,
-        rba_enabled=rba_enabled,
-        rba_eta=rba_eta,
-    )
-
     tracker = ExperimentTracker()
     results = []
 
@@ -311,54 +331,73 @@ def main():
     print("Training")
     print("=" * 70)
 
-    for i, problem in enumerate(problems, 1):
-        print(f"\n[{i}/{len(problems)}] Training {problem.name}...")
-        print("-" * 70)
+    total_runs = len(problems) * len(combinations)
+    run_idx = 0
 
-        # Get wave speed from problem if using characteristic transform
-        characteristic_c = getattr(problem, 'c', 1.0) if use_characteristic else 1.0
+    for problem in problems:
+        for combo in combinations:
+            run_idx += 1
+            eps, pts, eps_count, res_method, opt, lr = combo
+            
+            print(f"\n[{run_idx}/{total_runs}] Problem: {problem.name}")
+            print(f"  Params: eps={eps}, points={pts}, epochs={eps_count}, res={res_method}, opt={opt}, lr={lr}")
+            print("-" * 70)
 
-        # Create architecture config for this problem
-        arch = NetworkConfig(
-            layers,
-            activation,
-            n_inputs=n_inputs,
-            n_outputs=1,
-            use_characteristic=use_characteristic,
-            characteristic_c=characteristic_c,
-        )
+            # Enforce uniform sampling for non-autograd methods
+            current_sampling = sampling_method if res_method == "autograd" else "uniform"
 
-        if use_characteristic:
-            print(f"Using characteristic transform with c={characteristic_c}")
+            config = Config(
+                epsilon=eps,
+                n_points=pts,
+                epochs=eps_count,
+                residual_method=res_method,
+                optimizer=opt,
+                learning_rate=lr,
+                sampling_method=current_sampling,
+                rba_enabled=rba_enabled,
+                rba_eta=rba_eta,
+            )
 
-        model = arch.build()
-        
-        # Pre-generate ID to use for intermediate artifacts like heatmaps
-        exp_id = tracker.generate_id(problem, config, arch)
-        
-        model, fig, metrics = train(problem, model, config, exp_id=exp_id)
-        tracker.log_run(problem, config, arch, model, metrics, fig)
+            # Get wave speed from problem if using characteristic transform
+            characteristic_c = getattr(problem, 'c', 1.0) if use_characteristic else 1.0
 
-        results.append({
-            "problem": problem.name,
-            "exp_id": exp_id,
-            "loss": metrics["final_loss"],
-            "time": metrics["training_time"],
-        })
+            # Create architecture config for this problem
+            arch = NetworkConfig(
+                layers,
+                activation,
+                n_inputs=n_inputs,
+                n_outputs=1,
+                use_characteristic=use_characteristic,
+                characteristic_c=characteristic_c,
+            )
 
-        print(f"✓ {problem.name} complete")
-        print(f"  Experiment ID: {exp_id}")
-        print(f"  Final Loss: {metrics['final_loss']:.5e}")
-        print(f"  Time: {metrics['training_time']:.2f}s")
+            model = arch.build()
+            
+            # Pre-generate ID to use for intermediate artifacts like heatmaps
+            exp_id = tracker.generate_id(problem, config, arch)
+            
+            model, fig, metrics = train(problem, model, config, exp_id=exp_id)
+            tracker.log_run(problem, config, arch, model, metrics, fig)
 
-    # Summary
+            results.append({
+                "problem": problem.name,
+                "exp_id": exp_id,
+                "loss": metrics["final_loss"],
+                "time": metrics["training_time"],
+                "params": f"eps={eps}, res={res_method}, opt={opt}, lr={lr}"
+            })
+
+            print(f"✓ {problem.name} complete (ID: {exp_id})")
+
+    # Final Summary Table
     print("\n" + "=" * 70)
     print("Training Complete - Summary")
     print("=" * 70)
-    print(f"{'Problem':<30} {'Loss':>12} {'Time':>8}")
+    print(f"{'Problem':<20} {'Params':<40} {'Loss':>12}")
     print("-" * 70)
     for r in results:
-        print(f"{r['problem']:<30} {r['loss']:>12.5e} {r['time']:>7.2f}s")
+        param_summary = r['params'][:37] + "..." if len(r['params']) > 40 else r['params']
+        print(f"{r['problem']:<20} {param_summary:<40} {r['loss']:>12.5e}")
 
     print(f"\n✓ All results saved to results/")
     print(f"✓ Models: results/model_<exp_id>.pth")
@@ -379,5 +418,7 @@ if __name__ == "__main__":
         print("\n\nInterrupted by user. Exiting.")
         sys.exit(0)
     except Exception as e:
-        print(f"\nError: {e}")
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
+
