@@ -159,6 +159,24 @@ class Visualizer:
                 return line_pinn, line_bench
             return (line_pinn,)
 
+        # Add config text
+        rba_status = f"ON (eta={record['rba_eta']})" if record.get("rba_enabled") else "OFF"
+        config_text = (
+            f"Exp: {exp_id} | Method: {record['residual_method']} | Sampling: {record['sampling_method']} | Opt: {record['optimizer']} (lr={record['learning_rate']})\n"
+            f"Layers: {record['network_layers']} | Epochs: {record['epochs']} | N: {record['n_points']} | Eps: {record.get('epsilon', 'N/A')} | RBA: {rba_status}\n"
+            f"Final Loss: {record['final_loss']:.2e} | Time: {record['training_time']:.1f}s"
+        )
+        fig.text(
+            0.5,
+            0.08,
+            config_text,
+            ha="center",
+            va="top",
+            fontsize=8,
+            bbox=dict(facecolor="white", alpha=0.7, edgecolor="gray", boxstyle="round,pad=0.3"),
+        )
+        plt.tight_layout(rect=[0, 0.08, 1, 0.98])
+
         anim = FuncAnimation(fig, update, frames=len(t_vals), blit=True)
 
         save_path = self.results_dir / "videos"
@@ -255,6 +273,24 @@ class Visualizer:
                 ax2d.set_ylim(problem.y_bounds[1], problem.y_bounds[0])
 
             return ax3d, ax2d
+
+        # Add config text
+        rba_status = f"ON (eta={record['rba_eta']})" if record.get("rba_enabled") else "OFF"
+        config_text = (
+            f"Exp: {exp_id} | Method: {record['residual_method']} | Sampling: {record['sampling_method']} | Opt: {record['optimizer']} (lr={record['learning_rate']})\n"
+            f"Layers: {record['network_layers']} | Epochs: {record['epochs']} | N: {record['n_points']} | Eps: {record.get('epsilon', 'N/A')} | RBA: {rba_status}\n"
+            f"Final Loss: {record['final_loss']:.2e} | Time: {record['training_time']:.1f}s"
+        )
+        fig.text(
+            0.5,
+            0.08,
+            config_text,
+            ha="center",
+            va="top",
+            fontsize=8,
+            bbox=dict(facecolor="white", alpha=0.7, edgecolor="gray", boxstyle="round,pad=0.3"),
+        )
+        plt.tight_layout(rect=[0, 0.08, 1, 0.98])
 
         anim = FuncAnimation(fig, update, frames=len(t_vals), blit=False)
 

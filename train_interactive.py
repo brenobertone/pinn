@@ -404,12 +404,6 @@ def main():
     print(f"✓ Plots: results/plot_<exp_id>.png")
     print(f"✓ Database: results/experiments.jsonl")
 
-    # Ask about visualization
-    print("\n" + "=" * 70)
-    visualize = get_input("Generate animations now? (y/n)", default="n").lower()
-    if visualize == "y":
-        print("\nRun: python visualize_interactive.py")
-
 
 if __name__ == "__main__":
     try:
