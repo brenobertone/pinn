@@ -270,19 +270,24 @@ def main():
         type_fn=float
     )
 
-    rba_enabled_choice = get_input(
-        "Enable Residual-Based Attention (RBA)? (y/n)",
-        default="n"
-    ).lower()
-    rba_enabled = (rba_enabled_choice == "y")
+    # RBA configuration
+    rba_selection = get_multi_choice(
+        "Residual-Based Attention (RBA) modes:",
+        ["Disabled", "Enabled"],
+        default_indices=[0]
+    )
 
-    rba_eta = 0.001
-    if rba_enabled:
-        rba_eta = get_input(
-            "RBA update rate (eta)",
+    rba_configs = []
+    if 0 in rba_selection:
+        rba_configs.append((False, 0.0))
+    if 1 in rba_selection:
+        rba_etas = get_input_list(
+            "RBA update rates (eta) for enabled mode (comma-separated)",
             default=0.001,
             type_fn=float
         )
+        for eta in rba_etas:
+            rba_configs.append((True, eta))
 
     # Generate Cartesian product of all parameters
     combinations = list(itertools.product(
@@ -291,7 +296,8 @@ def main():
         epochs_list,
         residual_methods,
         optimizers,
-        learning_rates
+        learning_rates,
+        rba_configs
     ))
 
     # Summary
@@ -308,14 +314,12 @@ def main():
     print(f"Residual Methods: {residual_methods}")
     print(f"Optimizers: {optimizers}")
     print(f"Learning Rates: {learning_rates}")
+    print(f"RBA Configs: {rba_configs}")
     arch_desc = f"{layers} ({activation})"
     if use_characteristic:
         arch_desc += " + characteristic"
     print(f"Architecture: {arch_desc}")
     print(f"Sampling: {sampling_method} (if autograd)")
-    print(f"RBA Enabled: {rba_enabled}")
-    if rba_enabled:
-        print(f"RBA Eta: {rba_eta}")
     print("=" * 70)
 
     proceed = get_input("\nProceed with training? (y/n)", default="y").lower()
@@ -337,10 +341,10 @@ def main():
     for problem in problems:
         for combo in combinations:
             run_idx += 1
-            eps, pts, eps_count, res_method, opt, lr = combo
+            eps, pts, eps_count, res_method, opt, lr, (rba_on, rba_val) = combo
             
             print(f"\n[{run_idx}/{total_runs}] Problem: {problem.name}")
-            print(f"  Params: eps={eps}, points={pts}, epochs={eps_count}, res={res_method}, opt={opt}, lr={lr}")
+            print(f"  Params: eps={eps}, points={pts}, epochs={eps_count}, res={res_method}, opt={opt}, lr={lr}, rba={rba_on}({rba_val})")
             print("-" * 70)
 
             # Enforce uniform sampling for non-autograd methods
@@ -354,8 +358,8 @@ def main():
                 optimizer=opt,
                 learning_rate=lr,
                 sampling_method=current_sampling,
-                rba_enabled=rba_enabled,
-                rba_eta=rba_eta,
+                rba_enabled=rba_on,
+                rba_eta=rba_val,
             )
 
             # Get wave speed from problem if using characteristic transform
@@ -384,7 +388,7 @@ def main():
                 "exp_id": exp_id,
                 "loss": metrics["final_loss"],
                 "time": metrics["training_time"],
-                "params": f"eps={eps}, res={res_method}, opt={opt}, lr={lr}"
+                "params": f"eps={eps}, res={res_method}, rba={rba_on}({rba_val})"
             })
 
             print(f"✓ {problem.name} complete (ID: {exp_id})")
