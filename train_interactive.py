@@ -5,7 +5,10 @@ Prompts for all configuration options with defaults.
 """
 
 import itertools
+import os
+import shutil
 import sys
+from datetime import datetime
 
 from pinn.core.architectures import NetworkConfig
 from pinn.core.training import Config, train
@@ -392,6 +395,18 @@ def main():
             })
 
             print(f"✓ {problem.name} complete (ID: {exp_id})")
+
+            # Zip and download results between cases
+            zip_name = f"results_checkpoint_{run_idx}"
+            zip_path = f"{zip_name}.zip"
+            shutil.make_archive(zip_name, 'zip', 'results')
+            
+            if 'google.colab' in sys.modules:
+                try:
+                    from google.colab import files
+                    files.download(zip_path)
+                except Exception as e:
+                    print(f"  ✗ Colab auto-download failed: {e}")
 
     # Final Summary Table
     print("\n" + "=" * 70)
